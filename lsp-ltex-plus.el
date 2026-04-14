@@ -649,13 +649,6 @@ calls `lsp-deferred` to start the server.  It uses
     ;; When disabling, we add the server to disabled clients so it doesn't restart.
     (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
 
-(defun lsp-ltex-plus-setup-hooks ()
-  "Set up activation hooks for all modes in `lsp-ltex-plus-major-modes'."
-  (interactive)
-  (dolist (pair lsp-ltex-plus-major-modes)
-    (let ((hook (intern (concat (symbol-name (car pair)) "-hook"))))
-      (add-hook hook #'lsp-ltex-plus-mode))))
-
 (defun lsp-ltex-plus--global-activate ()
   "Activate `lsp-ltex-plus-mode' if the major mode is in the allowed list."
   (when (assoc major-mode lsp-ltex-plus-major-modes)
