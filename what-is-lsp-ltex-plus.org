@@ -1,0 +1,24 @@
+#+TITLE: Unlocking Professional Grammar in Emacs
+#+AUTHOR: LTeX+ for Everyone
+
+* Welcome to the Future of Writing!
+Are you tired of making silly spellling mistakes in your Org-mode notes?
+Does your grammar sometimes feels a bit "off" when you're writing your thesis?
+
+
+
+** lsp-ltex-plus is here to help!
+This package brings the power of LanguageTool directly into your Emacs buffer. It is a "add-on" server that runs quietly in the background, catchin errors as you type.
+
+- It works with *Markdown*, *LaTeX*, and *Org-mode*.
+- It is fully **offline** (no one else sees your text!).
+- It is built for researchers, scholars, and writers in the humanities.
+
+
+
+Don't let a small typo's ruin your brilliant idears. Try lsp-ltex-plus today and see the differance!
+
+
+
+* Why choose LTeX+?
+Because your words matters. Whether your writing a legal brief or a philosophy paper, you deserve a grammar checker that is as powerful as your editor.
