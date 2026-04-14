@@ -116,8 +116,25 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
       (setq lsp-ltex-plus-lt-api-key key))))
   ```
 
-  ### Key Settings
+### Lsp-mode Protocol Patch (Kind-First Routing)
 
+LTeX+ frequently initiates its own requests to Emacs (e.g., to fetch your configuration). In high-latency environments—such as when using a **remote server**—this can occasionally lead to a JSON-RPC "id collision" and a protocol deadlock, where both Emacs and the server wait for each other indefinitely.
+
+This package includes a "Kind-First" routing patch that fixes this at the protocol level.
+
+*   **When to use:** Highly recommended if you use a **remote/online server**.
+*   **When to skip:** Usually not needed if you use the **local server**, as the low latency makes collisions extremely unlikely.
+*   **Upstream Note:** We plan to submit this fix to `lsp-mode` so it can eventually be integrated into the core package.
+
+To enable the patch, add this to your `:custom` block:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-apply-kind-first-patch t))
+```
+
+  ### Key Settings
 - `lsp-ltex-plus-language`: The language variant to check (e.g., `"en-US"`, `"de-DE"`).
 - `lsp-ltex-plus-diagnostic-severity`: Set to `"warning"`, `"error"`, `"information"`, or `"hint"`.
 - `lsp-ltex-plus-additional-rules-enable-picky-rules`: Set to `t` if you want stricter grammar checks (e.g., passive voice detection).
