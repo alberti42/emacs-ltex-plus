@@ -1,5 +1,12 @@
 ;;; lsp-ltex-plus.el --- Minimal lsp-mode client for ltex-ls-plus -*- lexical-binding: t; -*-
 
+;; Author: Andrea Alberti <a.alberti82@gmail.com>
+;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "27.1") (lsp-mode "6.0"))
+;; Keywords: lsp, grammar, spelling, convenience
+;; URL: https://github.com/alberti42/emacs-ltex-plus
+
 ;; This Source Code Form is subject to the terms of the Mozilla Public
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
