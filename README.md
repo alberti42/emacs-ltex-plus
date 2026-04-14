@@ -80,7 +80,41 @@ If you want to add or remove support for specific file types, simply customize t
                                (text-mode     . "plaintext"))))
 ```
 
-### Key Settings
+### Ready-to-go Configuration Example
+
+For a more robust setup using `use-package` and `straight.el`, you can use the following pattern. This example shows how to automatically pull credentials from your system environment variables if you choose to use an online service:
+
+```elisp
+(use-package lsp-ltex-plus
+  :straight (lsp-ltex-plus
+             :type git
+             :host github
+             :repo "username/emacs-ltex-plus")
+
+  :custom
+  ;; To use the online service, set the URI. 
+  ;; If you prefer the local-only server, you can omit this (it defaults to nil).
+  (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")
+
+  ;; Severity can be "warning", "error", "information", or "hint"
+  (lsp-ltex-plus-diagnostic-severity "warning")
+
+  :init
+  ;; Activate the global mode to automatically hook into all supported files.
+  (global-lsp-ltex-plus-mode 1)
+
+  :config
+  ;; Optional: Automatically use credentials from environment variables.
+  ;; This is safer than hardcoding your API key in your configuration.
+  (let ((user (getenv "LANGUAGETOOL_USERNAME"))
+        (key  (getenv "LANGUAGETOOL_API_KEY")))
+    (when (and user (or (null lsp-ltex-plus-lt-username) (string-empty-p lsp-ltex-plus-lt-username)))
+      (setq lsp-ltex-plus-lt-username user))
+    (when (and key (or (null lsp-ltex-plus-lt-api-key) (string-empty-p lsp-ltex-plus-lt-api-key)))
+      (setq lsp-ltex-plus-lt-api-key key))))
+  ```
+
+  ### Key Settings
 
 - `lsp-ltex-plus-language`: The language variant to check (e.g., `"en-US"`, `"de-DE"`).
 - `lsp-ltex-plus-diagnostic-severity`: Set to `"warning"`, `"error"`, `"information"`, or `"hint"`.
