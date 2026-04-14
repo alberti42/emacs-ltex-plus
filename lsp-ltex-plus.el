@@ -66,17 +66,6 @@ detailed log files in /tmp."
   :type 'file
   :group 'lsp-ltex-plus)
 
-(defcustom lsp-ltex-plus-enabled ["bibtex" "context" "context.tex" "html" "latex" "markdown" "mdx" "typst" "asciidoc" "neorg" "org" "quarto" "restructuredtext" "rsweave"]
-  "Controls whether the extension is enabled.
-Allows disabling LanguageTool on specific workspaces or for specific code
-language modes (i.e., file types).
-
-Either supply a Boolean value stating whether LTeX+ is enabled for all supported
-markup languages or disabled for all of them, or supply a list of code language
-identifiers for which LTeX+ should be enabled."
-  :type '(choice boolean (vector string))
-  :group 'lsp-ltex-plus)
-
 (defcustom lsp-ltex-plus-major-modes
   '((markdown-mode   . "markdown")
     (gfm-mode        . "markdown")
@@ -96,8 +85,9 @@ identifiers for which LTeX+ should be enabled."
     (norg-mode       . "neorg")
     (quarto-mode     . "quarto"))
   "Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation.
-Each entry enables the mode and registers its language identifier with
-lsp-mode via `lsp-language-id-configuration'."
+This is the single source of truth for where LTeX+ is active.
+Each entry enables the minor mode for that major mode and registers
+its language identifier with lsp-mode."
   :type '(alist :key-type symbol :value-type string)
   :group 'lsp-ltex-plus)
 
@@ -548,7 +538,7 @@ requests collide with client response IDs."
 
   (lsp-ltex-plus--log "Registering settings and client...")
   (lsp-register-custom-settings
-   '(("ltex.enabled"                             lsp-ltex-plus-enabled)
+   '(("ltex.enabled"                             t)
      ("ltex.language"                            lsp-ltex-plus-language)
      ("ltex.dictionary"                          lsp-ltex-plus--dictionary)
      ("ltex.enabledRules"                        lsp-ltex-plus-enabled-rules)
@@ -594,7 +584,7 @@ requests collide with client response IDs."
     :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
                       (lsp-notify "workspace/didChangeConfiguration"
-                                  `(:settings (:ltex (:enabled ,lsp-ltex-plus-enabled
+                                  `(:settings (:ltex (:enabled t
                                                                :language ,lsp-ltex-plus-language
                                                                :enabledRules ,lsp-ltex-plus-enabled-rules
                                                                :disabledRules ,lsp-ltex-plus-disabled-rules
