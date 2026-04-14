@@ -2,6 +2,8 @@
 
 `lsp-ltex-plus` is a lightweight [lsp-mode](https://github.com/emacs-lsp/lsp-mode) client for **LTeX+**, a powerful grammar and spell checker powered by [LanguageTool](https://languagetool.org/).
 
+For detailed information about the underlying LTeX+ server and its capabilities, please refer to the [official LTeX+ documentation](https://ltex-plus.github.io/ltex-plus/index.html).
+
 This package allows you to have professional-grade grammar checking in Emacs while you write Markdown, LaTeX, Org-mode, and more. It is designed to be an "add-on" server, meaning it runs quietly in the background alongside your existing programming language servers.
 
 ## New to Emacs or LSP?
@@ -119,6 +121,58 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
 - `lsp-ltex-plus-language`: The language variant to check (e.g., `"en-US"`, `"de-DE"`).
 - `lsp-ltex-plus-diagnostic-severity`: Set to `"warning"`, `"error"`, `"information"`, or `"hint"`.
 - `lsp-ltex-plus-additional-rules-enable-picky-rules`: Set to `t` if you want stricter grammar checks (e.g., passive voice detection).
+
+## Customization
+
+`lsp-ltex-plus` supports the full range of customizable parameters provided by the LTeX+ server, alongside unique settings specific to this Emacs client (such as debugging tools).
+
+You can configure these using `:custom` in `use-package`:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  ;; Client-specific: Enable detailed logging for troubleshooting
+  (lsp-ltex-plus-debug t)
+  ;; Server-specific: Provide a custom path to the LTeX+ root directory
+  (lsp-ltex-plus-ltex-ls-path "~/path/to/ltex-ls-plus-18.6.1")
+  ;; Server-specific: Set the language
+  (lsp-ltex-plus-language "en-GB"))
+```
+
+<details>
+<summary><b>Click to see the full list of supported parameters</b></summary>
+
+| Parameter | Description | Official LTeX+ Setting |
+| :--- | :--- | :---: |
+| `lsp-ltex-plus-ls-plus-executable` | The name or path of the ltex-ls-plus executable. | |
+| `lsp-ltex-plus-debug` | When non-nil, enable verbose logging and JSON-RPC tracing. | |
+| `lsp-ltex-plus-major-modes` | Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation. | |
+| `lsp-ltex-plus-language` | The language (e.g., "en-US") LanguageTool should check against. | X |
+| `lsp-ltex-plus-enabled-rules` | Lists of rules that should be enabled (language-specific). | X |
+| `lsp-ltex-plus-disabled-rules` | Lists of rules that should be disabled (language-specific). | X |
+| `lsp-ltex-plus-bibtex-fields` | List of BibTeX fields whose values are to be checked. | X |
+| `lsp-ltex-plus-latex-commands` | List of LaTeX commands to be handled by the LaTeX parser. | X |
+| `lsp-ltex-plus-latex-environments` | List of LaTeX environments to be handled by the LaTeX parser. | X |
+| `lsp-ltex-plus-markdown-nodes` | List of Markdown node types to be handled by the Markdown parser. | X |
+| `lsp-ltex-plus-additional-rules-enable-picky-rules` | Enable LanguageTool rules that are marked as picky. | X |
+| `lsp-ltex-plus-additional-rules-mother-tongue` | Optional mother tongue of the user (e.g., "de-DE"). | X |
+| `lsp-ltex-plus-additional-rules-language-model` | Optional path to a directory with n-gram language models. | X |
+| `lsp-ltex-plus-lt-server-uri` | Base URI for the LanguageTool HTTP server (set to nil for local-only). | X |
+| `lsp-ltex-plus-lt-username` | Username for LanguageTool Premium API access. | X |
+| `lsp-ltex-plus-lt-api-key` | API key for LanguageTool Premium API access. | X |
+| `lsp-ltex-plus-ltex-ls-path` | Path to the root directory of ltex-ls-plus. | X |
+| `lsp-ltex-plus-ltex-ls-log-level` | Logging level of the ltex-ls-plus server log. | X |
+| `lsp-ltex-plus-java-path` | Path to an existing Java installation (JAVA_HOME). | X |
+| `lsp-ltex-plus-java-initial-heap` | Initial size of the Java heap memory (MB). | X |
+| `lsp-ltex-plus-java-max-heap` | Maximum size of the Java heap memory (MB). | X |
+| `lsp-ltex-plus-sentence-cache-size` | Size of the LanguageTool ResultCache in sentences. | X |
+| `lsp-ltex-plus-completion-enabled` | Controls whether completion is enabled (IntelliSense). | X |
+| `lsp-ltex-plus-diagnostic-severity` | Severity of the diagnostics (error, warning, information, hint). | X |
+| `lsp-ltex-plus-check-frequency` | Controls when documents should be checked (edit, save, manual). | X |
+| `lsp-ltex-plus-clear-diagnostics-when-closing-file` | Whether to clear diagnostics when a file is closed. | X |
+| `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
+
+</details>
 
 ## Usage
 
