@@ -37,7 +37,7 @@
 (require 'seq)
 (require 'cl-lib)
 
-;;;; ── Customization ───────────────────────────────────────────────────────────
+;;;; -- Customization ----------------------------------------------------------
 
 (defgroup lsp-ltex-plus nil
   "Customization group for the LTEX+ grammar checker."
@@ -282,7 +282,7 @@ Note: This is a global surgical patch affecting all LSP servers."
 - \"messages\": Log the type of requests and responses.
 - \"verbose\": Log the type and contents of requests and responses.")
 
-;;;; ── Internal State & Logging ───────────────────────────────────────────────
+;;;; -- Internal State & Logging -----------------------------------------------
 
 (defvar lsp-ltex-plus--start-time nil
   "Timestamp of when `lsp-ltex-plus--setup' was executed.")
@@ -311,7 +311,7 @@ Note: This is a global surgical patch affecting all LSP servers."
   `(when lsp-ltex-plus-debug
      (lsp-ltex-plus--log-to-buffer (format ,fmt ,@args))))
 
-;;;; ── Dictionary Management ──────────────────────────────────────────────────
+;;;; -- Dictionary Management --------------------------------------------------
 
 (defvar lsp-ltex-plus-dictionary-file
   (expand-file-name "lsp-ltex-plus/stored-dictionary" user-emacs-directory)
@@ -392,7 +392,7 @@ Items in vectors are merged and deduplicated using `string=`."
   (interactive)
   (message "[lsp-ltex-plus] External Dictionary: %S" lsp-ltex-plus--dictionary))
 
-;;;; ── Action Handlers ────────────────────────────────────────────────────────
+;;;; -- Action Handlers --------------------------------------------------------
 
 (defun lsp-ltex-plus--action-add-to-dictionary (action)
   "Process the _ltex.addToDictionary action from the server."
@@ -441,11 +441,11 @@ Items in vectors are merged and deduplicated using `string=`."
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
 
-;;;; ── Lsp-mode Patch ──────────────────────────────────────────────────────────────
+;;;; -- Lsp-mode Patch ---------------------------------------------------------
 
 ;; This section contains a protocol-level deadlock fix for `lsp-mode`.
 ;;
-;; ── THE PROBLEM: ID COLLISIONS ───────────────────────────────────────────────
+;; PROBLEM: ID COLLISIONS 
 ;;
 ;; Standard `lsp-mode` routes incoming JSON-RPC messages based on the 'id' field:
 ;; 1. If 'id' is present, it's treated as a RESPONSE to a client request.
@@ -458,7 +458,7 @@ Items in vectors are merged and deduplicated using `string=`."
 ;; This results in a protocol deadlock where both sides are waiting for each
 ;; other indefinitely.
 ;;
-;; ── THE SOLUTION: KIND-FIRST ROUTING ─────────────────────────────────────────
+;; SOLUTION: KIND-FIRST ROUTING
 ;;
 ;; The "Kind-First" patch below redefines `lsp--parser-on-message` to prioritize
 ;; the 'method' field over the 'id' field. If a 'method' is present, we know the
@@ -528,7 +528,7 @@ requests collide with client response IDs."
           ('request
            (lsp--on-request workspace json-data)))))))
 
-;;;; ── Lsp-mode Registration ───────────────────────────────────────────────────────
+;;;; -- Lsp-mode Registration --------------------------------------------------
 
 (defun lsp-ltex-plus--setup ()
   "Initialize and register the ltex-ls-plus client with lsp-mode."
@@ -626,7 +626,7 @@ requests collide with client response IDs."
             ("_ltex.hideFalsePositives" #'lsp-ltex-plus--action-hide-false-positives))))
   (lsp-ltex-plus--log "lsp-ltex-plus--setup completed."))
 
-;;;; ── Activation ─────────────────────────────────────────────────────────────
+;;;; -- Activation -------------------------------------------------------------
 
 (defun lsp-ltex-plus-buffer-setup-default ()
   "Apply sane default buffer-local settings for ltex-ls-plus."
