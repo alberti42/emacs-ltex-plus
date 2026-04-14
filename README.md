@@ -116,15 +116,17 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
       (setq lsp-ltex-plus-lt-api-key key))))
   ```
 
-### Lsp-mode Protocol Patch (Kind-First Routing)
+### Lsp-mode Protocol Patch
 
-LTeX+ frequently initiates its own requests to Emacs (e.g., to fetch your configuration). In high-latency environments—such as when using a **remote server**—this can occasionally lead to a JSON-RPC "id collision" and a protocol deadlock, where both Emacs and the server wait for each other indefinitely.
+LTeX+ frequently initiates its own requests to Emacs (e.g., to fetch your configuration). In high-latency environments—such as when using a **remote server**—these server requests often overlap with Emacs's own requests to the server (like checking a document). 
 
-This package includes a "Kind-First" routing patch that fixes this at the protocol level.
+Because a remote document check can take several hundred milliseconds to complete, there is a very high probability that the server will send a request while Emacs is still waiting for a response. In this scenario, a JSON-RPC "id collision" occurs: `lsp-mode`'s default parser misinterprets the server's new request as a response to its own pending check, causing both sides to hang indefinitely.
 
-*   **When to use:** Highly recommended if you use a **remote/online server**.
-*   **When to skip:** Usually not needed if you use the **local server**, as the low latency makes collisions extremely unlikely.
-*   **Upstream Note:** We plan to submit this fix to `lsp-mode` so it can eventually be integrated into the core package.
+This package includes a protocol-level patch that ensures Emacs doesn't just trust request ID numbers (which can collide). Instead, it analyzes the message format to distinguish with certainty whether a message is a new request from the server or a response to a previous client request.
+
+*   **When to use:** **Required** if you use a **remote/online server**. Without this patch, the connection **will** deadlock as soon as a server request overlaps with a pending document check.
+*   **When to skip:** Usually not needed if you use the **local server**, as the near-instantaneous response time makes such overlaps extremely unlikely.
+*   **Upstream Note:** I plan to submit this fix to `lsp-mode` so it can eventually be integrated into the core package. Because this is a protocol-level improvement, enabling it will generally improve the stability and reliability of **all** your other LSP clients as well.
 
 To enable the patch, add this to your `:custom` block:
 
