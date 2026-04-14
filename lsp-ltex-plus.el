@@ -578,6 +578,10 @@ requests collide with client response IDs."
                          (list lsp-ltex-plus-ls-plus-executable))))
     :major-modes (mapcar #'car lsp-ltex-plus-major-modes)
     :server-id 'ltex-ls-plus
+    ;; Priority -1 ensures LTeX+ acts as an auxiliary server.  It will not
+    ;; "hijack" primary LSP features (like Go to Definition or Completion) if a
+    ;; language-specific server (like texlab or pyright) is also active in the
+    ;; buffer.
     :priority -1
     :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
