@@ -23,7 +23,8 @@
 ;; EXTERNAL DEPENDENCIES
 ;;
 ;; - ltex-ls-plus binary on PATH
-;; - Java runtime (required by the server)
+;; - Java runtime (Platform-specific ltex-ls-plus releases include a bundled
+;;   Java runtime; otherwise, Java 21+ is required on your system).
 ;; - Optional: LanguageTool.org account (for premium features)
 
 ;;; Code:

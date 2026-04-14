@@ -16,8 +16,8 @@ This package allows you to have professional-grade grammar checking in Emacs whi
 
 Before using this package, you need:
 
-1.  **LTeX+ Language Server:** Follow the installation instructions at [ltex-plus/ltex-ls-plus](https://github.com/ltex-plus/ltex-ls-plus). Ensure the `ltex-ls-plus` binary is in your system `PATH`.
-2.  **Java:** A Java runtime (JRE) is required to run the LTeX+ server.
+1.  **LTeX+ Language Server:** Follow the installation instructions at [ltex-plus/ltex-ls-plus](https://github.com/ltex-plus/ltex-ls-plus). Ensure the `ltex-ls-plus` binary is discoverable by Emacs (e.g., by adding it to your system `PATH` or by setting `lsp-ltex-plus-ls-plus-executable` to the full path).
+2.  **Java:** Platform-specific LTeX+ releases include a bundled Java runtime. Otherwise, a Java runtime (JRE/JDK) version 21 or higher is required on your system.
 3.  **Emacs lsp-mode:** This package is an extension for `lsp-mode`.
 
 ## Installation
