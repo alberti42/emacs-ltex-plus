@@ -668,6 +668,16 @@ calls `lsp-deferred` to start the server.  It uses
     (let ((hook (intern (concat (symbol-name (car pair)) "-hook"))))
       (add-hook hook #'lsp-ltex-plus-mode))))
 
+(defun lsp-ltex-plus--global-activate ()
+  "Activate `lsp-ltex-plus-mode' if the major mode is in the allowed list."
+  (when (assoc major-mode lsp-ltex-plus-major-modes)
+    (lsp-ltex-plus-mode 1)))
+
+;;;###autoload
+(define-globalized-minor-mode global-lsp-ltex-plus-mode lsp-ltex-plus-mode
+  lsp-ltex-plus--global-activate
+  :group 'lsp-ltex-plus)
+
 ;; Initialize on lsp-mode load.
 (with-eval-after-load 'lsp-mode
   (dolist (pair lsp-ltex-plus-major-modes)
