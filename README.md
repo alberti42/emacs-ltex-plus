@@ -143,7 +143,7 @@ To enable the patch, add this to your `:custom` block:
 
 ## Customization
 
-`lsp-ltex-plus` supports the full range of customizable parameters provided by the LTeX+ server, alongside unique settings specific to this Emacs client (such as debugging tools).
+`lsp-ltex-plus` supports the full range of customizable parameters provided by the LTeX+ server, alongside unique settings specific to this Emacs client (such as debugging tools). For detailed documentation on the official LTeX+ server settings, visit the [official settings page](https://ltex-plus.github.io/ltex-plus/settings.html).
 
 You can configure these using `:custom` in `use-package`:
 
