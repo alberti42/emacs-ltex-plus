@@ -39,13 +39,26 @@ Download `lsp-ltex-plus.el`, place it in your load path, and require it:
 
 ## Basic Configuration
 
-To enable LTeX+ automatically for supported files, add the following to your configuration:
+The most idiomatic way to use this package is to enable the **global minor mode**. It will automatically activate LTeX+ in any buffer that matches the languages in its supported list.
 
 ```elisp
-(with-eval-after-load 'lsp-mode
-  (require 'lsp-ltex-plus)
-  (setq lsp-ltex-plus-language "en-US") ; Set your preferred language
-  (lsp-ltex-plus-setup-hooks))          ; Enable for all supported major modes
+(use-package lsp-ltex-plus
+  :init
+  (global-lsp-ltex-plus-mode 1))
+```
+
+### Customizing Supported Modes
+
+If you want to add or remove support for specific file types, simply customize the `lsp-ltex-plus-major-modes` variable. The global mode will automatically respect your changes for all new buffers:
+
+```elisp
+(use-package lsp-ltex-plus
+  :init
+  (global-lsp-ltex-plus-mode 1)
+  :custom
+  (lsp-ltex-plus-major-modes '((markdown-mode . "markdown")
+                               (org-mode      . "org")
+                               (text-mode     . "plaintext"))))
 ```
 
 ### Key Settings
