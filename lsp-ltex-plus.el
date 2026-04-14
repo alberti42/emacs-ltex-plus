@@ -535,6 +535,7 @@ requests collide with client response IDs."
       (setq lsp-ltex-plus-trace-server "messages")))
 
   (lsp-ltex-plus--log "Registering settings and client...")
+  (lsp-ltex-plus--log "Registering ltex-ls-plus client (priority: -1)...")
   (lsp-register-custom-settings
    `(("ltex.enabled"                             t)
      ("ltex.language"                            lsp-ltex-plus-language)
@@ -578,7 +579,6 @@ requests collide with client response IDs."
     :major-modes (mapcar #'car lsp-ltex-plus-major-modes)
     :server-id 'ltex-ls-plus
     :priority -1
-    :add-on? t
     :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
                       (lsp-notify "workspace/didChangeConfiguration"
@@ -645,7 +645,12 @@ calls `lsp-deferred` to start the server.  It uses
             (setq lsp-ltex-plus-mode nil))
         (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
         (funcall lsp-ltex-plus-buffer-setup-function)
-        (lsp-deferred))
+        ;; If lsp-mode isn't already active, calling lsp-deferred won't do
+        ;; anything unless another server triggers lsp-mode.  We call (lsp) to
+        ;; ensure lsp-mode starts.
+        (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
+            (lsp)
+          (lsp-deferred)))
     ;; When disabling, we add the server to disabled clients so it doesn't restart.
     (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
 
