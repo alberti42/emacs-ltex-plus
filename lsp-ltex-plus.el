@@ -1,5 +1,9 @@
 ;;; lsp-ltex-plus.el --- Minimal lsp-mode client for ltex-ls-plus -*- lexical-binding: t; -*-
 
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 ;;; Commentary:
 ;;
 ;; This module provides a self-contained lsp-mode client for ltex-ls-plus,
@@ -466,49 +470,63 @@ Items in vectors are merged and deduplicated using `string=`."
 This redefines `lsp--parser-on-message' with the logic to prioritize
 the 'method' field, preventing deadlocks when server-initiated
 requests collide with client response IDs."
-  (lsp-ltex-plus--log "Applying Kind-First patch to lsp--parser-on-message...")
-  (defun lsp--parser-on-message (json-data workspace)
-    "Patched lsp--parser-on-message to prioritize 'method' (Kind-First routing).
-This prevents server-initiated requests from being misrouted as responses
-to client requests when IDs collide."
-    (with-demoted-errors "Error processing message %S."
-      (with-lsp-workspace workspace
-        (-let* ((client (lsp--workspace-client workspace))
-                (message-type (cond
-                               ((lsp:json-message-method? json-data)
-                                (if (lsp:json-message-id? json-data) 'request 'notification))
-                               ((lsp:json-message-id? json-data)
-                                (if (lsp:json-message-error? json-data) 'response-error 'response))
-                               (t 'notification)))
-                (id (--when-let (lsp:json-response-id json-data)
-                      (if (stringp it) (string-to-number it) it)))
-                (data (lsp:json-response-result json-data)))
-          (pcase message-type
-            ('response
-             (cl-assert id)
-             (-let [(callback _ method _ before-send) (gethash id (lsp--client-response-handlers client))]
-               (when (lsp--log-io-p method)
-                 (lsp--log-entry-new
-                  (lsp--make-log-entry method id data 'incoming-resp
-                                       (lsp--ms-since before-send))
-                  workspace))
-               (when callback
-                 (remhash id (lsp--client-response-handlers client))
-                 (funcall callback (lsp:json-response-result json-data)))))
-            ('response-error
-             (cl-assert id)
-             (-let [(_ callback method _ before-send) (gethash id (lsp--client-response-handlers client))]
-               (when (lsp--log-io-p method)
-                 (lsp--log-entry-new
-                  (lsp--make-log-entry method id (lsp:json-response-error-error json-data)
-                                       'incoming-resp (lsp--ms-since before-send))
-                  workspace))
-               (when callback
-                 (remhash id (lsp--client-response-handlers client))
-                 (funcall callback (lsp:json-response-error-error json-data)))))
-            ('notification
-             (lsp--on-notification workspace json-data))
-            ('request (lsp--on-request workspace json-data))))))))
+  ;; Silently catch and log any errors during message processing. This prevents
+  ;; a single malformed message from crashing the entire LSP client.
+  (with-demoted-errors "Error processing message %S."
+    (with-lsp-workspace workspace
+      (let* ((client (lsp--workspace-client workspace))
+             (method (lsp-core--json-get json-data "method"))
+             (raw-id (lsp-core--json-get json-data "id"))
+             (has-method (not (null method)))
+             (has-id (not (null raw-id)))
+             (has-error (not (null (lsp-core--json-get json-data "error"))))
+             ;; Kind-First routing: if a method exists, it's a server-initiated
+             ;; message (request/notification) regardless of ID collisions.
+             (message-type (cond
+                            (has-method (if has-id 'request 'notification))
+                            (has-id (if has-error 'response-error 'response))
+                            (t 'notification)))
+             ;; Normalize response IDs only (client-generated ids are numeric).
+             (id (and (memq message-type '(response response-error))
+                      raw-id
+                      (if (stringp raw-id) (string-to-number raw-id) raw-id))))
+        (pcase message-type
+          ('response
+           (when id
+             (let ((handler (gethash id (lsp--client-response-handlers client))))
+               (when handler
+                 (let ((callback (nth 0 handler))
+                       (cb-method (nth 2 handler))
+                       (before-send (nth 4 handler))
+                       (result (lsp-core--json-get json-data "result")))
+                   (when (lsp--log-io-p cb-method)
+                     (lsp--log-entry-new
+                      (lsp--make-log-entry cb-method id result 'incoming-resp
+                                           (lsp--ms-since before-send))
+                      workspace))
+                   (when callback
+                     (remhash id (lsp--client-response-handlers client))
+                     (funcall callback result)))))))
+          ('response-error
+           (when id
+             (let ((handler (gethash id (lsp--client-response-handlers client))))
+               (when handler
+                 (let ((err-callback (nth 1 handler))
+                       (cb-method (nth 2 handler))
+                       (before-send (nth 4 handler))
+                       (err (lsp-core--json-get json-data "error")))
+                   (when (lsp--log-io-p cb-method)
+                     (lsp--log-entry-new
+                      (lsp--make-log-entry cb-method id err 'incoming-resp
+                                           (lsp--ms-since before-send))
+                      workspace))
+                   (when err-callback
+                     (remhash id (lsp--client-response-handlers client))
+                     (funcall err-callback err)))))))
+          ('notification
+           (lsp--on-notification workspace json-data))
+          ('request
+           (lsp--on-request workspace json-data)))))))
 
 ;;;; ── Lsp-mode Registration ───────────────────────────────────────────────────────
 
