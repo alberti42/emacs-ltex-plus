@@ -164,10 +164,13 @@ Set this to the parent directory that contains subdirectories for languages."
   :type 'string
   :group 'lsp-ltex-plus)
 
-(defcustom lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com"
+(defcustom lsp-ltex-plus-lt-server-uri nil
   "Base URI for the LanguageTool HTTP server.
+When nil (default), ltex-ls-plus uses its local, built-in LanguageTool.
+To use an online service, set this to e.g., \"https://api.languagetoolplus.com\".
 Note: ltex-ls-plus appends /v2/check to this, so omit the /v2 suffix here."
-  :type 'string
+  :type '(choice (const :tag "Local (Built-in)" nil)
+                 (string :tag "Remote URI"))
   :group 'lsp-ltex-plus)
 
 (defcustom lsp-ltex-plus-lt-username ""
@@ -533,7 +536,7 @@ requests collide with client response IDs."
 
   (lsp-ltex-plus--log "Registering settings and client...")
   (lsp-register-custom-settings
-   '(("ltex.enabled"                             t)
+   `(("ltex.enabled"                             t)
      ("ltex.language"                            lsp-ltex-plus-language)
      ("ltex.dictionary"                          lsp-ltex-plus--dictionary)
      ("ltex.enabledRules"                        lsp-ltex-plus-enabled-rules)
@@ -546,7 +549,7 @@ requests collide with client response IDs."
      ("ltex.additionalRules.enablePickyRules"    lsp-ltex-plus-additional-rules-enable-picky-rules)
      ("ltex.additionalRules.motherTongue"        lsp-ltex-plus-additional-rules-mother-tongue)
      ("ltex.additionalRules.languageModel"       lsp-ltex-plus-additional-rules-language-model)
-     ("ltex.languageToolHttpServerUri"           lsp-ltex-plus-lt-server-uri)
+     ("ltex.languageToolHttpServerUri"           ,(lambda () (or lsp-ltex-plus-lt-server-uri "")))
      ("ltex.languageToolOrg.username"            lsp-ltex-plus-lt-username)
      ("ltex.ltex-ls.languageToolOrgApiKey"       lsp-ltex-plus-lt-api-key)
      ("ltex.ltex-ls.path"                        lsp-ltex-plus-ltex-ls-path)
@@ -591,7 +594,7 @@ requests collide with client response IDs."
                                                                :additionalRules (:enablePickyRules ,lsp-ltex-plus-additional-rules-enable-picky-rules
                                                                                                    :motherTongue ,lsp-ltex-plus-additional-rules-mother-tongue
                                                                                                    :languageModel ,lsp-ltex-plus-additional-rules-language-model)
-                                                               :languageToolHttpServerUri ,lsp-ltex-plus-lt-server-uri
+                                                               :languageToolHttpServerUri ,(or lsp-ltex-plus-lt-server-uri "")
                                                                :languageToolOrg (:username ,lsp-ltex-plus-lt-username)
                                                                :ltex-ls (:languageToolOrgApiKey ,lsp-ltex-plus-lt-api-key
                                                                                                 :path ,lsp-ltex-plus-ltex-ls-path
