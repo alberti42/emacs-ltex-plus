@@ -2,7 +2,7 @@
 
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "27.1") (lsp-mode "6.0"))
 ;; Keywords: lsp, grammar, spelling, convenience
 ;; URL: https://github.com/alberti42/emacs-ltex-plus
@@ -23,7 +23,7 @@
 ;;    texlab or basedpyright) without interference.
 ;;
 ;; 2. Transparent Settings: Settings are registered via lsp-register-custom-settings.
-;;    The server fetches these via workspace/configuration. Updating the Lisp
+;;    The server fetches these via workspace/configuration.  Updating the Lisp
 ;;    variables (like the dictionary) results in immediate server updates on
 ;;    the next check.
 ;;
@@ -89,7 +89,7 @@ detailed log files in /tmp."
     (quarto-mode     . "quarto"))
   "Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation.
 This decides where LTeX+ is active.  Each entry enables the minor mode
-for that major mode and registers its language identifier with lsp-mode."
+for that major mode and registers its language identifier with `lsp-mode'."
   :type '(alist :key-type symbol :value-type string)
   :group 'lsp-ltex-plus)
 
@@ -100,24 +100,24 @@ generic language code like \"en\" or \"de\" to obtain spelling corrections (in
 addition to grammar corrections).
 
 When using the language code \"auto\", LTeX+ will try to detect the language of
-the document. This is not recommended, as only generic languages like \"en\" or
+the document.  This is not recommended, as only generic languages like \"en\" or
 \"de\" will be detected and thus no spelling errors might be reported."
   :type 'string
   :group 'lsp-ltex-plus)
 
 (defcustom lsp-ltex-plus-enabled-rules nil
-  "Lists of rules that should be enabled (if disabled by default by LanguageTool).
+  "Lists of rules that should be enabled (if disabled by default).
 This setting is language-specific, so use an object of the format
-'(:en-US [\"RULE1\" \"RULE2\"] :de-DE [\"RULE1\" ...]) where the key is the
-language code and the value is a vector of rule IDs."
+\\='(:en-US [\"RULE1\" \"RULE2\"] :de-DE [\"RULE1\" ...]) where the key is
+the language code and the value is a vector of rule IDs."
   :type 'plist
   :group 'lsp-ltex-plus)
 
 (defcustom lsp-ltex-plus-disabled-rules nil
-  "Lists of rules that should be disabled (if enabled by default by LanguageTool).
+  "Lists of rules that should be disabled (if enabled by default).
 This setting is language-specific, so use an object of the format
-'(:en-US [\"RULE1\" \"RULE2\"] :de-DE [\"RULE1\" ...]) where the key is the
-language code and the value is a vector of rule IDs."
+\\='(:en-US [\"RULE1\" \"RULE2\"] :de-DE [\"RULE1\" ...]) where the key is
+the language code and the value is a vector of rule IDs."
   :type 'plist
   :group 'lsp-ltex-plus)
 
@@ -194,7 +194,7 @@ Only relevant if `lsp-ltex-plus-lt-server-uri' is set."
 
 (defcustom lsp-ltex-plus-ltex-ls-path ""
   "Use the path to the root directory of ltex-ls-plus.
-It contains bin and lib subdirectories. If empty, the bundled version is used."
+It contains bin and lib subdirectories.  If empty, the bundled version is used."
   :type 'string
   :group 'lsp-ltex-plus)
 
@@ -225,7 +225,7 @@ Use the same path as you would use for the JAVA_HOME environment variable."
 
 (defcustom lsp-ltex-plus-sentence-cache-size 2000
   "Size of the LanguageTool ResultCache in sentences.
-Decreasing this might decrease RAM usage. If you set this too small, checking
+Decreasing this might decrease RAM usage.  If you set this too small, checking
 time may increase significantly."
   :type 'integer
   :group 'lsp-ltex-plus)
@@ -262,10 +262,11 @@ Possible severities are \"error\", \"warning\", \"information\", and \"hint\"."
   :group 'lsp-ltex-plus)
 
 (defcustom lsp-ltex-plus-apply-kind-first-patch nil
-  "Whether to apply the 'Kind-First' routing patch to `lsp-mode'.
-This patch redefines `lsp--parser-on-message' to prioritize the 'method' field,
-preventing deadlocks when server-initiated requests (like workspace/configuration)
-collide with client requests.
+  "Whether to apply the \\='Kind-First\\=' routing patch to `lsp-mode'.
+This patch redefines `lsp--parser-on-message' to prioritize the
+\\='method\\=' field, preventing deadlocks when server-initiated
+requests (like workspace/configuration) collide with client
+requests.
 
 Note: This is a global surgical patch affecting all LSP servers."
   :type 'boolean
@@ -302,7 +303,8 @@ Note: This is a global surgical patch affecting all LSP servers."
       (setq buffer-read-only t))))
 
 (defmacro lsp-ltex-plus--log (fmt &rest args)
-  "Log a formatted message if `lsp-ltex-plus-debug' is enabled."
+  "Log a formatted message if `lsp-ltex-plus-debug' is enabled.
+FMT is the format string, and ARGS are the arguments for it."
   `(when lsp-ltex-plus-debug
      (lsp-ltex-plus--log-to-buffer (format ,fmt ,@args))))
 
@@ -325,7 +327,7 @@ Note: This is a global surgical patch affecting all LSP servers."
   "Path to the external hidden false positives file (plist format).")
 
 (defun lsp-ltex-plus--load-plist (file-path)
-  "Load a plist from FILE-PATH. Return nil if it doesn't exist or fails."
+  "Load a plist from FILE-PATH.  Return nil if it doesn't exist or fails."
   (lsp-ltex-plus--log "Loading plist from %s" file-path)
   (if (not (file-exists-p file-path))
       (progn (lsp-ltex-plus--log "File not found: %s" file-path) nil)
@@ -390,7 +392,7 @@ Items in vectors are merged and deduplicated using `string=`."
 ;;;; -- Action Handlers --------------------------------------------------------
 
 (defun lsp-ltex-plus--action-add-to-dictionary (action)
-  "Process the _ltex.addToDictionary action from the server."
+  "Process the _ltex.addToDictionary ACTION from the server."
   (lsp-ltex-plus--log "Action: addToDictionary")
   (let* ((args (gethash "arguments" action))
          (arg0 (and (vectorp args) (aref args 0)))
@@ -406,7 +408,7 @@ Items in vectors are merged and deduplicated using `string=`."
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
 (defun lsp-ltex-plus--action-disable-rules (action)
-  "Process the _ltex.disableRules action."
+  "Process the _ltex.disableRules ACTION."
   (lsp-ltex-plus--log "Action: disableRules")
   (let* ((args (gethash "arguments" action))
          (arg0 (and (vectorp args) (aref args 0)))
@@ -421,7 +423,7 @@ Items in vectors are merged and deduplicated using `string=`."
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
 (defun lsp-ltex-plus--action-hide-false-positives (action)
-  "Process the _ltex.hideFalsePositives action."
+  "Process the _ltex.hideFalsePositives ACTION."
   (lsp-ltex-plus--log "Action: hideFalsePositives")
   (let* ((args (gethash "arguments" action))
          (arg0 (and (vectorp args) (aref args 0)))
@@ -440,93 +442,112 @@ Items in vectors are merged and deduplicated using `string=`."
 
 ;; This section contains a protocol-level deadlock fix for `lsp-mode`.
 ;;
-;; PROBLEM: ID COLLISIONS 
+;; PROBLEM: ID COLLISIONS
 ;;
-;; Standard `lsp-mode` routes incoming JSON-RPC messages based on the 'id' field:
-;; 1. If 'id' is present, it's treated as a RESPONSE to a client request.
-;; 2. If 'method' is present (but no 'id'), it's a NOTIFICATION or REQUEST.
+;; Standard `lsp-mode` routes incoming JSON-RPC messages based on the \\='id\\=' field:
+;; 1. If \\='id\\=' is present, it\\='s treated as a RESPONSE to a client request.
+;; 2. If \\='method\\=' is present (but no \\='id\\='), it\\='s a NOTIFICATION or REQUEST.
 ;;
 ;; LTeX+ frequently initiates its own requests (like `workspace/configuration`)
 ;; to fetch your dictionary and rules. If the server-initiated request uses an
 ;; ID that `lsp-mode` is already tracking for a client-side request, `lsp-mode`
-;; will misroute the server's request as a response to its own request.
+;; will misroute the server\\='s request as a response to its own request.
 ;; This results in a protocol deadlock where both sides are waiting for each
 ;; other indefinitely.
 ;;
 ;; SOLUTION: KIND-FIRST ROUTING
 ;;
-;; The "Kind-First" patch below redefines `lsp--parser-on-message` to prioritize
-;; the 'method' field over the 'id' field. If a 'method' is present, we know the
-;; message is a Request or Notification from the server, regardless of whether
-;; the ID happens to collide with an internal Emacs ID.
+;; The "Kind-First" patch below provides `lsp-core--parser-on-message-patch'
+;; which prioritizes the \\='method\\=' field over the \\='id\\=' field.
+;; If a \\='method\\=' is present, we know the message is a Request or
+;; Notification from the server, regardless of whether the ID happens to
+;; collide with an internal Emacs ID.
+
+(defun lsp-core--parser-on-message-patch (json-data workspace)
+  "Patched `lsp--parser-on-message' to prioritize \\='method\\=' (Kind-First routing).
+
+This prevents server-initiated requests from being misrouted as responses
+to client requests when IDs collide."
+  ;; Define a local helper for JSON parsing. This is an auxiliary function
+  ;; used exclusively by the patch to ensure the package remains standalone.
+  (cl-labels ((json-get (obj key)
+                (cond
+                 ((hash-table-p obj)
+                  (gethash key obj))
+                 ((listp obj)
+                  (or (plist-get obj (intern (concat ":" key)))
+                      (plist-get obj (intern key))))
+                 (t nil))))
+    ;; Silently catch and log any errors during message processing. This prevents
+    ;; a single malformed message from crashing the entire LSP client.
+    (with-demoted-errors "Error processing message %S."
+      (with-lsp-workspace workspace
+        (let* ((client (lsp--workspace-client workspace))
+               (method (json-get json-data "method"))
+               (raw-id (json-get json-data "id"))
+               (has-method (not (null method)))
+               (has-id (not (null raw-id)))
+               (has-error (not (null (json-get json-data "error"))))
+               ;; Kind-First routing: if a method exists, it's a server-initiated
+               ;; message (request/notification) regardless of ID collisions.
+               (message-type (cond
+                              (has-method (if has-id 'request 'notification))
+                              (has-id (if has-error 'response-error 'response))
+                              (t 'notification)))
+               ;; Normalize response IDs only (client-generated ids are numeric).
+               (id (and (memq message-type '(response response-error))
+                        raw-id
+                        (if (stringp raw-id) (string-to-number raw-id) raw-id))))
+          (pcase message-type
+            ('response
+             (when id
+               (let ((handler (gethash id (lsp--client-response-handlers client))))
+                 (when handler
+                   (let ((callback (nth 0 handler))
+                         (cb-method (nth 2 handler))
+                         (before-send (nth 4 handler))
+                         (result (json-get json-data "result")))
+                     (when (lsp--log-io-p cb-method)
+                       (lsp--log-entry-new
+                        (lsp--make-log-entry cb-method id result 'incoming-resp
+                                             (lsp--ms-since before-send))
+                        workspace))
+                     (when callback
+                       (remhash id (lsp--client-response-handlers client))
+                       (funcall callback result)))))))
+            ('response-error
+             (when id
+               (let ((handler (gethash id (lsp--client-response-handlers client))))
+                 (when handler
+                   (let ((err-callback (nth 1 handler))
+                         (cb-method (nth 2 handler))
+                         (before-send (nth 4 handler))
+                         (err (json-get json-data "error")))
+                     (when (lsp--log-io-p cb-method)
+                       (lsp--log-entry-new
+                        (lsp--make-log-entry cb-method id err 'incoming-resp
+                                             (lsp--ms-since before-send))
+                        workspace))
+                     (when err-callback
+                       (remhash id (lsp--client-response-handlers client))
+                       (funcall err-callback err)))))))
+            ('notification
+             (lsp--on-notification workspace json-data))
+            ('request
+             (lsp--on-request workspace json-data))))))))
 
 (defun lsp-ltex-plus--apply-lsp-mode-patch ()
-  "Apply the 'Kind-First' patch to `lsp-mode'.
-This redefines `lsp--parser-on-message' with the logic to prioritize
-the 'method' field, preventing deadlocks when server-initiated
-requests collide with client response IDs."
-  ;; Silently catch and log any errors during message processing. This prevents
-  ;; a single malformed message from crashing the entire LSP client.
-  (with-demoted-errors "Error processing message %S."
-    (with-lsp-workspace workspace
-      (let* ((client (lsp--workspace-client workspace))
-             (method (lsp-core--json-get json-data "method"))
-             (raw-id (lsp-core--json-get json-data "id"))
-             (has-method (not (null method)))
-             (has-id (not (null raw-id)))
-             (has-error (not (null (lsp-core--json-get json-data "error"))))
-             ;; Kind-First routing: if a method exists, it's a server-initiated
-             ;; message (request/notification) regardless of ID collisions.
-             (message-type (cond
-                            (has-method (if has-id 'request 'notification))
-                            (has-id (if has-error 'response-error 'response))
-                            (t 'notification)))
-             ;; Normalize response IDs only (client-generated ids are numeric).
-             (id (and (memq message-type '(response response-error))
-                      raw-id
-                      (if (stringp raw-id) (string-to-number raw-id) raw-id))))
-        (pcase message-type
-          ('response
-           (when id
-             (let ((handler (gethash id (lsp--client-response-handlers client))))
-               (when handler
-                 (let ((callback (nth 0 handler))
-                       (cb-method (nth 2 handler))
-                       (before-send (nth 4 handler))
-                       (result (lsp-core--json-get json-data "result")))
-                   (when (lsp--log-io-p cb-method)
-                     (lsp--log-entry-new
-                      (lsp--make-log-entry cb-method id result 'incoming-resp
-                                           (lsp--ms-since before-send))
-                      workspace))
-                   (when callback
-                     (remhash id (lsp--client-response-handlers client))
-                     (funcall callback result)))))))
-          ('response-error
-           (when id
-             (let ((handler (gethash id (lsp--client-response-handlers client))))
-               (when handler
-                 (let ((err-callback (nth 1 handler))
-                       (cb-method (nth 2 handler))
-                       (before-send (nth 4 handler))
-                       (err (lsp-core--json-get json-data "error")))
-                   (when (lsp--log-io-p cb-method)
-                     (lsp--log-entry-new
-                      (lsp--make-log-entry cb-method id err 'incoming-resp
-                                           (lsp--ms-since before-send))
-                      workspace))
-                   (when err-callback
-                     (remhash id (lsp--client-response-handlers client))
-                     (funcall err-callback err)))))))
-          ('notification
-           (lsp--on-notification workspace json-data))
-          ('request
-           (lsp--on-request workspace json-data)))))))
+  "Apply the protocol patch to `lsp-mode'.
+This patches `lsp--parser-on-message' using :override advice to
+prioritize the \\='method\\=' field over \\='id\\=', preventing
+deadlocks when server-initiated requests collide with client
+response IDs."
+  (advice-add 'lsp--parser-on-message :override #'lsp-core--parser-on-message-patch))
 
 ;;;; -- Lsp-mode Registration --------------------------------------------------
 
 (defun lsp-ltex-plus--setup ()
-  "Initialize and register the ltex-ls-plus client with lsp-mode."
+  "Initialize and register the ltex-ls-plus client with `lsp-mode'."
   (setq lsp-ltex-plus--start-time (current-time))
   (lsp-ltex-plus--log "Initializing lsp-ltex-plus...")
 
@@ -642,7 +663,7 @@ requests collide with client response IDs."
 
 ;;;###autoload
 (define-minor-mode lsp-ltex-plus-mode
-  "Minor mode for LTEX+ grammar checking via lsp-mode.
+  "Minor mode for LTEX+ grammar checking via `lsp-mode'.
 
 When enabled, this mode configures the buffer for ltex-ls-plus and
 calls `lsp-deferred` to start the server.  It uses

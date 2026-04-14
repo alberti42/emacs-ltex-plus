@@ -1,6 +1,17 @@
 # Change Log
 
-## [0.1.0] - First Release
+## [0.1.1] - 2026-04-14
+
+### Added
+- Implemented protocol-level deadlock fix ("Kind-First" routing) using `advice-add` with `:override`.
+- Added `lsp-core--json-get` helper to ensure the package is standalone and functional.
+
+### Fixed
+- Fixed unescaped single quotes in docstrings to resolve byte-compiler warnings.
+- Fixed typos in variable names (`lsp-ltex-plus-enabledRules` -> `lsp-ltex-plus-enabled-rules`).
+- Resolved "free variable" warnings in `lsp-ltex-plus--setup`.
+
+## [0.1.0] - 2026-04-14
 
 This is the first release of `lsp-ltex-plus` for Emacs!
 
