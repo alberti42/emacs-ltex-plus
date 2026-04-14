@@ -9,23 +9,18 @@
 ;; This module provides a self-contained lsp-mode client for ltex-ls-plus,
 ;; a LanguageTool-based grammar and spell checker.
 ;;
-;; ── DESIGN PRINCIPLES ────────────────────────────────────────────────────────
+;; DESIGN PRINCIPLES
 ;;
-;; 1. Kind-First Routing: Built-in lsp-mode can deadlock when server-initiated
-;;    requests (like workspace/configuration) collide with client requests.
-;;    This module assumes the "Kind-First" dispatcher patch in lsp-core.el
-;;    is active to handle such bi-directional traffic safely.
-;;
-;; 2. Add-on Integration: Registered with :add-on? t and :priority -1,
+;; 1. Add-on Integration: Registered with :add-on? t and :priority -1,
 ;;    allowing it to run concurrently with primary language servers (e.g.,
 ;;    texlab or basedpyright) without interference.
 ;;
-;; 3. Transparent Settings: Settings are registered via lsp-register-custom-settings.
+;; 2. Transparent Settings: Settings are registered via lsp-register-custom-settings.
 ;;    The server fetches these via workspace/configuration. Updating the Lisp
 ;;    variables (like the dictionary) results in immediate server updates on
 ;;    the next check.
 ;;
-;; ── EXTERNAL DEPENDENCIES ────────────────────────────────────────────────────
+;; EXTERNAL DEPENDENCIES
 ;;
 ;; - ltex-ls-plus binary on PATH
 ;; - Java runtime (required by the server)
@@ -85,9 +80,8 @@ detailed log files in /tmp."
     (norg-mode       . "neorg")
     (quarto-mode     . "quarto"))
   "Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation.
-This is the single source of truth for where LTeX+ is active.
-Each entry enables the minor mode for that major mode and registers
-its language identifier with lsp-mode."
+This decides where LTeX+ is active.  Each entry enables the minor mode
+for that major mode and registers its language identifier with lsp-mode."
   :type '(alist :key-type symbol :value-type string)
   :group 'lsp-ltex-plus)
 
