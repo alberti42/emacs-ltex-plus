@@ -180,30 +180,21 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
       (setq lsp-ltex-plus-lt-api-key key))))
   ```
 
-### Lsp-mode Protocol Patch
-
-LTeX+ frequently initiates its own requests to Emacs (e.g., to fetch your configuration). In high-latency environments—such as when using a **remote server**—these server requests often overlap with Emacs's own requests to the server (like checking a document). 
-
-Because a remote document check can take several hundred milliseconds to complete, there is a very high probability that the server will send a request while Emacs is still waiting for a response. In this scenario, a JSON-RPC "id collision" occurs: `lsp-mode`'s default parser misinterprets the server's new request as a response to its own pending check, causing both sides to hang indefinitely.
-
-This package includes a protocol-level patch that ensures Emacs doesn't just trust request ID numbers (which can collide). Instead, it analyzes the message format to distinguish with certainty whether a message is a new request from the server or a response to a previous client request.
-
-*   **When to use:** **Required** if you use a **remote/online server**. Without this patch, the connection **will** deadlock as soon as a server request overlaps with a pending document check.
-*   **When to skip:** Usually not needed if you use the **local server**, as the near-instantaneous response time makes such overlaps extremely unlikely.
-*   **Upstream Note:** I plan to submit this fix to `lsp-mode` so it can eventually be integrated into the core package. Because this is a protocol-level improvement, enabling it will generally improve the stability and reliability of **all** your other LSP clients as well.
-
-To enable the patch, add this to your `:custom` block:
-
-```elisp
-(use-package lsp-ltex-plus
-  :custom
-  (lsp-ltex-plus-apply-kind-first-patch t))
-```
-
-  ### Key Settings
+### Key Settings
 - `lsp-ltex-plus-language`: The language variant to check (e.g., `"en-US"`, `"de-DE"`).
 - `lsp-ltex-plus-diagnostic-severity`: Set to `"warning"`, `"error"`, `"information"`, or `"hint"`.
 - `lsp-ltex-plus-additional-rules-enable-picky-rules`: Set to `t` if you want stricter grammar checks (e.g., passive voice detection).
+
+## Usage
+
+Once active, LTeX+ works just like any other LSP server:
+
+- **Diagnostics:** Errors and warnings will be highlighted in your buffer.
+- **Code Actions:** Use your standard `lsp-execute-code-action` (usually `s-l a` or `C-c l a`) to:
+    - Add a word to your personal dictionary.
+    - Disable a specific rule you don't like.
+    - Ignore a false positive.
+
 
 ## Customization
 
@@ -257,16 +248,6 @@ You can configure these using `:custom` in `use-package`:
 
 </details>
 
-## Usage
-
-Once active, LTeX+ works just like any other LSP server:
-
-- **Diagnostics:** Errors and warnings will be highlighted in your buffer.
-- **Code Actions:** Use your standard `lsp-execute-code-action` (usually `s-l a` or `C-c l a`) to:
-    - Add a word to your personal dictionary.
-    - Disable a specific rule you don't like.
-    - Ignore a false positive.
-
 ## Troubleshooting
 
 All variables mentioned below are standard Emacs customization options. If you use `use-package`, it is recommended to set them within the `:custom` block of your configuration.
@@ -299,6 +280,67 @@ If you encounter crashes, try increasing the maximum heap size:
 ```
 
 While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes. See [Java Runtime Configuration](#3-java-runtime-configuration) for more context.
+
+## TL;DR Further insight into the inner mechanics
+
+### Lsp-mode Protocol Patch
+
+LTeX+ frequently initiates its own requests to Emacs (e.g., to fetch your configuration). In high-latency environments—such as when using a **remote server**—these server requests often overlap with Emacs's own requests to the server (like checking a document). 
+
+Because a remote document check can take several hundred milliseconds to complete, there is a very high probability that the server will send a request while Emacs is still waiting for a response. In this scenario, a JSON-RPC "id collision" occurs: `lsp-mode`'s default parser misinterprets the server's new request as a response to its own pending check, causing both sides to hang indefinitely.
+
+This package includes a protocol-level patch that ensures Emacs doesn't just trust request ID numbers (which can collide). Instead, it analyzes the message format to distinguish with certainty whether a message is a new request from the server or a response to a previous client request.
+
+*   **When to use:** **Required** if you use a **remote/online server**. Without this patch, the connection **will** deadlock as soon as a server request overlaps with a pending document check.
+*   **When to skip:** Usually not needed if you use the **local server**, as the near-instantaneous response time makes such overlaps extremely unlikely.
+*   **Upstream Note:** I plan to submit this fix to `lsp-mode` so it can eventually be integrated into the core package. Because this is a protocol-level improvement, enabling it will generally improve the stability and reliability of **all** your other LSP clients as well.
+
+To enable the patch, add this to your `:custom` block:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-apply-kind-first-patch t))
+```
+
+### How does `lsp-ltex-plus-mode` get activated?
+
+Power users may wonder exactly what fires up the mode and when. There are two distinct activation paths.
+
+#### Path 1: Emacs starts, `lsp-mode` is already in the user's config
+
+When `straight.el` (or any package manager) builds `lsp-ltex-plus`, it scans the source file for `;;;###autoload` cookies and writes a `lsp-ltex-plus-autoloads.el` file. This autoloads file is loaded very early at startup — before any `use-package` form is evaluated — and it registers a lightweight stub for `global-lsp-ltex-plus-mode`. The full package is **not** loaded yet; only the symbol is known to Emacs.
+
+When `use-package` evaluates the `:init` block and calls `(global-lsp-ltex-plus-mode 1)`, it hits that stub, which triggers loading `lsp-ltex-plus.el`. At the bottom of the file sits:
+
+```elisp
+(with-eval-after-load 'lsp-mode
+  (lsp-ltex-plus--setup))
+```
+
+This form is read and executed immediately when the file loads — it registers a callback to run `lsp-ltex-plus--setup` as soon as `lsp-mode` is loaded. If `lsp-mode` is already loaded at that point, the callback fires immediately. If not, it is held until `lsp-mode` loads later. Either way, the client is always registered at the right moment, regardless of load order.
+
+
+
+#### Path 2: No prior `lsp-mode` in the config — user opens a grammar-checked file first
+
+The second path arises when a user opens, say, a Markdown file before `lsp-mode` has ever been loaded. The sequence is:
+
+```
+User opens markdown.md
+  → markdown-mode activates
+  → global-lsp-ltex-plus-mode hook fires → lsp-ltex-plus--global-activate
+      → (lsp-ltex-plus-mode 1)
+          → (lsp) is called  ← lsp-mode.el is loaded here for the first time
+              → (provide 'lsp-mode) fires inside lsp-mode.el
+                  → with-eval-after-load 'lsp-mode callbacks run
+                      → lsp-ltex-plus--setup  ← client is registered
+              → lsp-mode continues, finds the ltex-ls-plus client, activates it
+```
+
+The crucial detail is that `with-eval-after-load` fires **synchronously inside the `require` call**, at the exact moment `lsp-mode.el` evaluates `(provide 'lsp-mode)`. By the time `(lsp)` returns, the client is already registered. There is no race condition.
+
+This is why `with-eval-after-load` is the right tool here rather than, say, a user-facing hook: it handles both load orders automatically and keeps the internal dependency between `lsp-ltex-plus` and `lsp-mode` entirely transparent to the user.
 
 ## Why this package?
 
