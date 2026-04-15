@@ -182,8 +182,10 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
 
 ### Key Settings
 - `lsp-ltex-plus-language`: The language variant to check (e.g., `"en-US"`, `"de-DE"`).
-- `lsp-ltex-plus-diagnostic-severity`: Set to `"warning"`, `"error"`, `"information"`, or `"hint"`.
 - `lsp-ltex-plus-additional-rules-enable-picky-rules`: Set to `t` if you want stricter grammar checks (e.g., passive voice detection).
+- `lsp-ltex-plus-apply-kind-first-patch`: Set to `t` to enable the protocol deadlock fix (defaults to `nil`). **Strongly recommended if you use a remote server** — see [Communication Stalls — No More Diagnostics](#communication-stalls--no-more-diagnostics) for details.
+
+For the full list of available settings, see [Customization](#customization).
 
 ## Usage
 
