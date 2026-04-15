@@ -262,6 +262,24 @@ If Emacs cannot find the `ltex-ls-plus` binary, ensure it is in your system `PAT
 
 If it returns `nil`, you must either add the binary's directory to your `PATH` or provide the absolute path to the executable via `lsp-ltex-plus-ls-plus-executable`. See [Server Installation](#4-make-it-discoverable) for details.
 
+### Communication Stalls — No More Diagnostics
+
+**Symptom:** After a few edits, grammar diagnostics stop updating entirely. The `*lsp-log*` buffer shows no new activity, and the server appears alive but silent.
+
+**Cause:** This is a JSON-RPC ID collision deadlock. LTeX+ sends its own requests to Emacs (e.g., to fetch your configuration) while Emacs is still waiting for a response from the server. When the IDs of these two concurrent messages happen to collide, `lsp-mode`'s default parser misroutes the server's request as a response to a pending client request — causing both sides to wait for each other indefinitely.
+
+This is most likely with a **remote/online server**, where both network latency and the server's own processing time (it is a shared service handling many requests) mean that responses take long enough for message overlaps to become virtually inevitable. It can also occur, though rarely, with the local server.
+
+**Fix:** Enable the Kind-First protocol patch:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-apply-kind-first-patch t))
+```
+
+This makes `lsp-mode` classify messages by their content (presence of a `"method"` field) rather than by ID alone, which is the correct approach per the JSON-RPC specification. See [Lsp-mode Protocol Patch](#lsp-mode-protocol-patch) for the full technical explanation.
+
 ### Server Crashes or Memory Issues
 
 The LTeX+ server runs on the Java Virtual Machine (JVM) and can be memory-intensive. If the server crashes unexpectedly or becomes unresponsive, you may need to adjust its memory allocation.
