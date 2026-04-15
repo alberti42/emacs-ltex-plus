@@ -79,12 +79,23 @@ LTeX+ is a Java application. By default, the server uses the Java runtime bundle
 
 ### 4. Make it Discoverable
 
-For `lsp-ltex-plus` to work, Emacs must be able to find the `ltex-ls-plus` binary. You can either:
-- Add the `bin/` directory of the extracted server to your system `PATH` or Emacs `exec-path`.
-- Or, point to the executable directly in your configuration:
-  ```elisp
-  (setq lsp-ltex-plus-ls-plus-executable "/path/to/ltex-ls-plus/bin/ltex-ls-plus")
+For `lsp-ltex-plus` to work, Emacs must be able to find the `ltex-ls-plus` binary. You have several options:
+
+- **Symlink or Shim (Recommended):** To avoid cluttering your `PATH` with many individual directories, you can create a symlink or a small shim script in a directory that is already in your `PATH` (such as `~/.local/bin/` or `/usr/local/bin/`).
+  
+  Example (Linux/macOS symlink):
+  ```bash
+  ln -s /path/to/ltex-ls-plus/bin/ltex-ls-plus ~/.local/bin/ltex-ls-plus
   ```
+
+- **Direct Configuration:** If you prefer not to modify your system environment, you can point to the executable directly in your Emacs configuration:
+  ```elisp
+  (use-package lsp-ltex-plus
+    :custom
+    (lsp-ltex-plus-ls-plus-executable "/path/to/ltex-ls-plus/bin/ltex-ls-plus"))
+  ```
+
+- **Update PATH:** Alternatively, add the `bin/` directory of the extracted server to your system `PATH` (via your shell profile) or your Emacs `exec-path`.
 
 ## Installation (Emacs Package)
 
