@@ -74,7 +74,9 @@ LTeX+ is a Java application. By default, the server uses the Java runtime bundle
 - **Recommendation:** Start with the bundled Java runtime. It is guaranteed to be compatible.
 - **Using System Java:** If you already have Java 21+ installed and prefer to use it, you can delete the bundled `jdk-21.x.y/` folder. In this case, ensure your `JAVA_HOME` environment variable points to your system Java or explicitly set the path in Emacs:
   ```elisp
-  (setq lsp-ltex-plus-java-path "/path/to/your/java/home")
+  (use-package lsp-ltex-plus
+    :custom
+    (lsp-ltex-plus-java-path "/path/to/your/java/home"))
   ```
 
 ### 4. Make it Discoverable
@@ -86,6 +88,15 @@ For `lsp-ltex-plus` to work, Emacs must be able to find the `ltex-ls-plus` binar
   Example (Linux/macOS symlink):
   ```bash
   ln -s /path/to/ltex-ls-plus/bin/ltex-ls-plus ~/.local/bin/ltex-ls-plus
+  ```
+
+  Example (Bash shim script):
+  A shim is useful if you need to set environment variables like `JAVA_HOME` specifically for the server:
+  ```bash
+  #!/bin/bash
+  # Save this as ~/.local/bin/ltex-ls-plus and make it executable
+  export JAVA_HOME="/path/to/ltex-ls-plus/jdk-21.x.y"
+  exec "/path/to/ltex-ls-plus/bin/ltex-ls-plus" "$@"
   ```
 
 - **Direct Configuration:** If you prefer not to modify your system environment, you can point to the executable directly in your Emacs configuration:
