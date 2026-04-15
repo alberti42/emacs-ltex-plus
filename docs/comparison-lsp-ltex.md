@@ -1,11 +1,28 @@
 # Comparative Analysis: `lsp-ltex-plus` vs. `lsp-ltex`
 
-This document compares `lsp-ltex-plus` (this package) with the original [`lsp-ltex`](https://github.com/emacs-languagetool/lsp-ltex
-) package. While both act as LSP clients for LTeX, `lsp-ltex-plus` is a modernized, protocol-corrected implementation.
+This document compares `lsp-ltex-plus` (this package) with the original [`lsp-ltex`](https://github.com/emacs-languagetool/lsp-ltex) package. While both act as LSP clients for LTeX, `lsp-ltex-plus` is a modernized, protocol-corrected implementation.
 
 ---
 
-## 1. Modern Major Mode Support
+## 1. Core Stability: The LSP-Protocol Patch
+The most significant technical difference is the inclusion of the **Kind-First** routing patch in `lsp-ltex-plus`. 
+
+*   **The Problem:** The LTeX server frequently initiates its own requests (like `workspace/configuration`) to fetch your settings. Standard `lsp-mode` can misidentify these as responses to previous client requests if IDs collide (common with remote servers or high-latency environments). This leads to a permanent protocol deadlock where both Emacs and the server wait for each other indefinitely.
+*   **`lsp-ltex-plus` Solution:**
+    ```elisp
+    ;; Kind-First routing: if a method exists, it's a server-initiated
+    ;; message (request/notification) regardless of ID collisions.
+    (message-type (cond
+                   (has-method (if has-id 'request 'notification))
+                   (has-id (if has-error 'response-error 'response))
+                   (t 'notification)))
+    ```
+    *Source: `lsp-ltex-plus.el`, [lines 491-496](https://github.com/alberti42/emacs-ltex-plus/blob/db37bf3af620fbd21377999b22ad426fe7db2293/lsp-ltex-plus.el#L491-L496)
+*   **`lsp-ltex` Status:** Relies on default `lsp-mode` behavior, making it vulnerable to these specific protocol deadlocks.
+
+---
+
+## 2. Modern Major Mode Support
 `lsp-ltex-plus` includes built-in support for contemporary formats that the original package lacks or requires manual configuration for.
 
 *   **`lsp-ltex-plus` Unique Support:** `typst-mode`, `quarto-mode`, `norg-mode` (Neorg), and `asciidoc-mode`.
