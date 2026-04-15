@@ -40,11 +40,53 @@ LTeX+ can operate in two distinct ways, depending on your needs:
 
 Before using this package, you need:
 
-1.  **LTeX+ Language Server:** Follow the installation instructions at [ltex-plus/ltex-ls-plus](https://github.com/ltex-plus/ltex-ls-plus). Ensure the `ltex-ls-plus` binary is discoverable by Emacs (e.g., by adding it to your system `PATH` or by setting `lsp-ltex-plus-ls-plus-executable` to the full path).
-2.  **Java:** Platform-specific LTeX+ releases include a bundled Java runtime. Otherwise, a Java runtime (JRE/JDK) version 21 or higher is required on your system.
-3.  **Emacs lsp-mode:** This package is an extension for `lsp-mode`.
+1.  **LTeX+ Language Server:** This is the core engine that performs the grammar checks. See [Server Installation](#server-installation) below.
+2.  **Java:** LTeX+ requires **Java 21** or higher. Most platform-specific releases of LTeX+ include a bundled Java runtime, so you don't necessarily need to install it separately.
+3.  **Emacs lsp-mode:** This package is an extension for `lsp-mode` (version 6.0 or higher).
 
-## Installation
+## Server Installation
+
+The LTeX+ language server is a standalone program. You can install it anywhere on your computer that suits your workflow.
+
+### 1. Download the Server
+
+Download the latest release for your architecture from the [official GitHub releases page](https://github.com/ltex-plus/ltex-ls-plus/releases/latest). 
+
+Choose the file that matches your operating system and CPU architecture:
+
+- **Linux:** `ltex-ls-plus-X.Y.Z-linux-x64.tar.gz` or `ltex-ls-plus-X.Y.Z-linux-aarch64.tar.gz`
+- **macOS:** `ltex-ls-plus-X.Y.Z-mac-x64.tar.gz` or `ltex-ls-plus-X.Y.Z-mac-aarch64.tar.gz` (Apple Silicon)
+- **Windows:** `ltex-ls-plus-X.Y.Z-windows-x64.zip` or `ltex-ls-plus-X.Y.Z-windows-aarch64.zip`
+
+### 2. Choose an Installation Directory
+
+A common, Emacs-idiomatic place to store such tools is within your `.emacs.d` directory (e.g., `~/.emacs.d/ltex-ls-plus/`). However, you can place it anywhere—for instance, in `/usr/local/bin/` or a dedicated software folder.
+
+Once extracted, the package contains:
+- `bin/ltex-ls-plus`: The main executable used by this package.
+- `bin/ltex-cli-plus`: A command-line interface for LTeX+.
+- `jdk-21.x.y/`: A bundled Java runtime.
+
+### 3. Java Runtime Configuration
+
+LTeX+ is a Java application. By default, the server uses the Java runtime bundled within its own directory. 
+
+- **Recommendation:** Start with the bundled Java runtime. It is guaranteed to be compatible.
+- **Using System Java:** If you already have Java 21+ installed and prefer to use it, you can delete the bundled `jdk-21.x.y/` folder. In this case, ensure your `JAVA_HOME` environment variable points to your system Java or explicitly set the path in Emacs:
+  ```elisp
+  (setq lsp-ltex-plus-java-path "/path/to/your/java/home")
+  ```
+
+### 4. Make it Discoverable
+
+For `lsp-ltex-plus` to work, Emacs must be able to find the `ltex-ls-plus` binary. You can either:
+- Add the `bin/` directory of the extracted server to your system `PATH` or Emacs `exec-path`.
+- Or, point to the executable directly in your configuration:
+  ```elisp
+  (setq lsp-ltex-plus-ls-plus-executable "/path/to/ltex-ls-plus/bin/ltex-ls-plus")
+  ```
+
+## Installation (Emacs Package)
 
 ### Using straight.el
 
@@ -215,21 +257,11 @@ If Emacs cannot find the `ltex-ls-plus` binary, ensure it is in your system `PAT
 (executable-find "ltex-ls-plus")
 ```
 
-If it returns `nil`, you must either add the binary's directory to your `PATH` (using the `exec-path` variable in Emacs or your shell configuration) or provide the absolute path to the executable:
-
-```elisp
-;; Using setq
-(setq lsp-ltex-plus-ls-plus-executable "/absolute/path/to/ltex-ls-plus")
-
-;; Or using use-package
-(use-package lsp-ltex-plus
-  :custom
-  (lsp-ltex-plus-ls-plus-executable "/absolute/path/to/ltex-ls-plus"))
-```
+If it returns `nil`, you must either add the binary's directory to your `PATH` or provide the absolute path to the executable via `lsp-ltex-plus-ls-plus-executable`. See [Server Installation](#4-make-it-discoverable) for details.
 
 ### Server Crashes or Memory Issues
 
-The LTeX+ server runs on the Java Virtual Machine (JVM) and can be memory-intensive, especially when checking large documents or using many rules. If the server crashes unexpectedly or becomes unresponsive, you may need to adjust its memory allocation.
+The LTeX+ server runs on the Java Virtual Machine (JVM) and can be memory-intensive. If the server crashes unexpectedly or becomes unresponsive, you may need to adjust its memory allocation.
 
 You can control the Java heap size using these variables (values are in megabytes):
 
@@ -239,16 +271,12 @@ You can control the Java heap size using these variables (values are in megabyte
 If you encounter crashes, try increasing the maximum heap size:
 
 ```elisp
-;; Using setq
-(setq lsp-ltex-plus-java-max-heap 1024) ;; Increase to 1GB
-
-;; Or using use-package
 (use-package lsp-ltex-plus
   :custom
   (lsp-ltex-plus-java-max-heap 1024))
 ```
 
-While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes.
+While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes. See [Java Runtime Configuration](#3-java-runtime-configuration) for more context.
 
 ## Why this package?
 
