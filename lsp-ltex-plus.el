@@ -605,6 +605,9 @@ response IDs."
                                          (shell-quote-argument lsp-ltex-plus-server-output-log)))
                          (list lsp-ltex-plus-ls-plus-executable))))
     :major-modes (mapcar #'car lsp-ltex-plus-major-modes)
+    :language-id (lambda (buf)
+                   (cdr (assoc (buffer-local-value 'major-mode buf)
+                               lsp-ltex-plus-major-modes)))
     :server-id 'ltex-ls-plus
     ;; Priority -1 ensures LTeX+ acts as an auxiliary server.  It will not
     ;; "hijack" primary LSP features (like Go to Definition or Completion) if a
@@ -698,8 +701,6 @@ calls `lsp-deferred` to start the server.  It uses
 
 ;; Initialize on lsp-mode load.
 (with-eval-after-load 'lsp-mode
-  (dolist (pair lsp-ltex-plus-major-modes)
-    (add-to-list 'lsp-language-id-configuration pair))
   (lsp-ltex-plus--setup))
 
 (provide 'lsp-ltex-plus)
