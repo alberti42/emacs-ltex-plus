@@ -301,7 +301,9 @@ If you encounter crashes, try increasing the maximum heap size:
 
 While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes. See [Java Runtime Configuration](#3-java-runtime-configuration) for more context.
 
-## TL;DR Further insight into the inner mechanics
+## Under the Hood
+
+This section is for users who want to understand how `lsp-ltex-plus` works internally — useful context if you hit an unexpected issue or simply want to know what is happening behind the scenes.
 
 ### Lsp-mode Protocol Patch
 
