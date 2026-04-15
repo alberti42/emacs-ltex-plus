@@ -203,6 +203,53 @@ Once active, LTeX+ works just like any other LSP server:
     - Disable a specific rule you don't like.
     - Ignore a false positive.
 
+## Troubleshooting
+
+All variables mentioned below are standard Emacs customization options. If you use `use-package`, it is recommended to set them within the `:custom` block of your configuration.
+
+### Server Not Found
+
+If Emacs cannot find the `ltex-ls-plus` binary, ensure it is in your system `PATH`. You can verify this within Emacs by evaluating:
+
+```elisp
+(executable-find "ltex-ls-plus")
+```
+
+If it returns `nil`, you must either add the binary's directory to your `PATH` (using the `exec-path` variable in Emacs or your shell configuration) or provide the absolute path to the executable:
+
+```elisp
+;; Using setq
+(setq lsp-ltex-plus-ls-plus-executable "/absolute/path/to/ltex-ls-plus")
+
+;; Or using use-package
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-ls-plus-executable "/absolute/path/to/ltex-ls-plus"))
+```
+
+### Server Crashes or Memory Issues
+
+The LTeX+ server runs on the Java Virtual Machine (JVM) and can be memory-intensive, especially when checking large documents or using many rules. If the server crashes unexpectedly or becomes unresponsive, you may need to adjust its memory allocation.
+
+You can control the Java heap size using these variables (values are in megabytes):
+
+- `lsp-ltex-plus-java-initial-heap` (default: `64`): Corresponds to the `-Xms` Java option.
+- `lsp-ltex-plus-java-max-heap` (default: `512`): Corresponds to the `-Xmx` Java option.
+
+If you encounter crashes, try increasing the maximum heap size:
+
+```elisp
+;; Using setq
+(setq lsp-ltex-plus-java-max-heap 1024) ;; Increase to 1GB
+
+;; Or using use-package
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-java-max-heap 1024))
+```
+
+While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes.
+
 ## Why this package?
 
 Previously, the only available option was [lsp-ltex](https://github.com/emacs-languagetool/lsp-ltex). However, that package had not been updated to support the newer **plus** version of the server (`ltex-ls-plus`), and it suffered from persistent instability—at least on my setup using Emacs 31.0.50.
