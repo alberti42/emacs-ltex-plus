@@ -99,10 +99,7 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
   :custom
   ;; To use the online service, set the URI. 
   ;; If you prefer the local-only server, you can omit this (it defaults to nil).
-  (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")
-
-  ;; Severity can be "warning", "error", "information", or "hint"
-  (lsp-ltex-plus-diagnostic-severity "warning")
+  (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")    
 
   :init
   ;; Activate the global mode to automatically hook into all supported files.
