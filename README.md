@@ -325,11 +325,11 @@ To enable the patch, add this to your `:custom` block:
   (lsp-ltex-plus-apply-kind-first-patch t))
 ```
 
-### How does `lsp-ltex-plus-mode` get activated?
+### How does `lsp-ltex-plus-mode` get set up and activated?
 
 Power users may wonder exactly what fires up the mode and when. There are two distinct activation paths.
 
-#### Path 1: Emacs starts, `lsp-mode` is already in the user's config
+Set up: ..... 
 
 When `straight.el` (or any package manager) builds `lsp-ltex-plus`, it scans the source file for `;;;###autoload` cookies and writes a `lsp-ltex-plus-autoloads.el` file. This autoloads file is loaded very early at startup — before any `use-package` form is evaluated — and it registers a lightweight stub for `global-lsp-ltex-plus-mode`. The full package is **not** loaded yet; only the symbol is known to Emacs.
 
@@ -342,7 +342,26 @@ When `use-package` evaluates the `:init` block and calls `(global-lsp-ltex-plus-
 
 This form is read and executed immediately when the file loads — it registers a callback to run `lsp-ltex-plus--setup` as soon as `lsp-mode` is loaded. If `lsp-mode` is already loaded at that point, the callback fires immediately. If not, it is held until `lsp-mode` loads later. Either way, the client is always registered at the right moment, regardless of load order.
 
+#### Path 1: Emacs starts, `lsp-mode` is already in the user's config
 
+`:init` runs immediately when the use-package form is evaluated, before any package loading.
+
+But calling (global-lsp-ltex-plus-mode 1) there does not require the package to be loaded — it just requires the autoload stub to exist, which it does.
+
+The call sequence is:
+
+```
+Emacs starts
+→ straight.el loads lsp-ltex-plus-autoloads.el
+    → (autoload 'global-lsp-ltex-plus-mode "lsp-ltex-plus" ...)  ← stub registered
+→ use-package form is evaluated
+    → :custom sets variables
+    → :init runs → (global-lsp-ltex-plus-mode 1) ← hits the stub
+        → Emacs loads lsp-ltex-plus.el  ← full package loads now
+            → with-eval-after-load 'lsp-mode is registered
+    → :config runs  ← package is now loaded, safe to use anything
+
+```
 
 #### Path 2: No prior `lsp-mode` in the config — user opens a grammar-checked file first
 
