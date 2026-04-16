@@ -130,6 +130,11 @@
 This decides where LTeX+ is active.  Each entry enables the minor mode
 for that major mode and registers its language identifier with `lsp-mode'.
 
+The language-id strings are VS Code language identifiers, which are also
+the identifiers used by the LSP specification.  The canonical list is at
+URL `https://code.visualstudio.com/docs/languages/identifiers'.
+Extensions can define additional identifiers beyond that list.
+
 This variable is intentionally not autoloaded.  To read or modify it
 before hooks are installed, call `lsp-ltex-plus-ensure-major-modes'
 first — that function loads this file as a side effect.")

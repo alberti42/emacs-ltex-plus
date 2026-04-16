@@ -138,6 +138,8 @@ The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hoo
 
 ### Customizing Supported Modes
 
+`lsp-ltex-plus-major-modes` is an alist of `(major-mode . language-id)` pairs. The `car` of each entry is a standard Emacs major mode symbol. The `cdr` is a **VS Code language identifier** — the same identifier used by the LSP specification and by LTeX+ internally to decide which documents to check. The canonical list of these identifiers is at the [VS Code language identifiers page](https://code.visualstudio.com/docs/languages/identifiers); extensions can define additional ones beyond that list.
+
 To replace the default list entirely, set `lsp-ltex-plus-major-modes` in `:custom` (which runs before `:init`):
 
 ```elisp

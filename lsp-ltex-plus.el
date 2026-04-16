@@ -155,7 +155,12 @@ detailed log files in /tmp."
     (visual-basic-mode      . "vb"))
   "Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation.
 This decides where LTeX+ is active.  Each entry enables the minor mode
-for that major mode and registers its language identifier with `lsp-mode'."
+for that major mode and registers its language identifier with `lsp-mode'.
+
+The language-id strings are VS Code language identifiers, which are also
+the identifiers used by the LSP specification.  The canonical list is at
+URL `https://code.visualstudio.com/docs/languages/identifiers'.
+Extensions can define additional identifiers beyond that list."
   :type '(alist :key-type symbol :value-type string)
   :group 'lsp-ltex-plus)
 
