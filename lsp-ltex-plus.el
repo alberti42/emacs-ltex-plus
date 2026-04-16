@@ -768,8 +768,8 @@ silently."
         ;;   2. `lsp-language-id-configuration' — used to determine the language
         ;;      ID string sent in textDocument/didOpen and similar messages.
         ;; Modes already covered by lsp-mode's built-in defaults (markdown, org,
-        ;; latex, …) need no special treatment for table 2; modes outside that
-        ;; list (e.g. fundamental-mode) must be added explicitly.
+        ;; latex, …) need no special treatment for table 2; any mode not in
+        ;; those defaults must be added explicitly.
         (unless (assq major-mode lsp-ltex-plus-major-modes)
           (let ((lang-id (if (called-interactively-p 'any)
                              (read-string

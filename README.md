@@ -138,9 +138,14 @@ The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hoo
 
 ### Customizing Supported Modes
 
-`lsp-ltex-plus-major-modes` is an alist of `(major-mode . language-id)` pairs. The `car` of each entry is a standard Emacs major mode symbol. The `cdr` is a **VS Code language identifier** — the same identifier used by the LSP specification and by LTeX+ internally to decide which documents to check. The canonical list of these identifiers is at the [VS Code language identifiers page](https://code.visualstudio.com/docs/languages/identifiers); extensions can define additional ones beyond that list.
+`lsp-ltex-plus-major-modes` is an alist of `(major-mode . language-id)` pairs that serves as the **client's registry of supported modes**. It has two distinct roles:
 
-`lsp-ltex-plus-install-hooks` accepts three optional keyword arguments that let you filter or extend the default set without touching the variable itself.
+1. **What the client supports** — the `ltex-ls-plus` client will accept and grammar-check any buffer whose major mode appears in this alist. This is checked at activation time via the `:activation-fn` registered with `lsp-mode`, so the alist is consulted dynamically, not frozen at startup.
+2. **The language identifier sent over the wire** — the `cdr` of each entry is a **VS Code language identifier**, the same string the LSP specification uses in `textDocument/didOpen` and similar messages. LTeX+ uses it to select the correct grammar rules. The canonical list of identifiers is at the [VS Code language identifiers page](https://code.visualstudio.com/docs/languages/identifiers).
+
+**Hook installation is a separate concern.** `lsp-ltex-plus-install-hooks` reads `lsp-ltex-plus-major-modes` to decide which major-mode hooks trigger the auto-start of the server — but its keyword arguments (`:restrict-to`, `:exclude`, `:extend-to`) only affect which hooks are installed. They never modify `lsp-ltex-plus-major-modes` itself, which always retains the full registry of supported modes.
+
+This means that even if you restrict hook installation to just a few modes, you can still call `M-x lsp-ltex-plus-mode` manually in any other supported mode and the client will activate without prompting — because that mode is already in the registry.
 
 **Activate only a specific subset** with `:restrict-to` (whitelist):
 
