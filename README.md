@@ -127,26 +127,41 @@ Download `lsp-ltex-plus.el`, place it in your load path, and require it:
 
 ## Basic Configuration
 
-The most idiomatic way to use this package is to enable the **global minor mode**. It will automatically activate LTeX+ in any buffer that matches the languages in its supported list.
+The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hooks` in your `:init` block. It reads the default list of ~80 supported major modes and installs a lightweight hook for each one. The full package is loaded lazily — only when you first open a file whose major mode is on the list.
 
 ```elisp
 (use-package lsp-ltex-plus
+  :defer t
   :init
-  (global-lsp-ltex-plus-mode 1))
+  (lsp-ltex-plus-install-hooks))
 ```
 
 ### Customizing Supported Modes
 
-If you want to add or remove support for specific file types, simply customize the `lsp-ltex-plus-major-modes` variable. The global mode will automatically respect your changes for all new buffers:
+To replace the default list entirely, set `lsp-ltex-plus-major-modes` in `:custom` (which runs before `:init`):
 
 ```elisp
 (use-package lsp-ltex-plus
-  :init
-  (global-lsp-ltex-plus-mode 1)
+  :defer t
   :custom
   (lsp-ltex-plus-major-modes '((markdown-mode . "markdown")
                                (org-mode      . "org")
-                               (text-mode     . "plaintext"))))
+                               (text-mode     . "plaintext")))
+  :init
+  (lsp-ltex-plus-install-hooks))
+```
+
+To add or remove individual entries from the default list, call `lsp-ltex-plus-ensure-major-modes` **before** the `use-package` block. That call loads the bootstrap file and makes `lsp-ltex-plus-major-modes` available for editing:
+
+```elisp
+(lsp-ltex-plus-ensure-major-modes)
+(setq lsp-ltex-plus-major-modes
+      (assoc-delete-all 'python-mode lsp-ltex-plus-major-modes))
+
+(use-package lsp-ltex-plus
+  :defer t
+  :init
+  (lsp-ltex-plus-install-hooks))
 ```
 
 ### Ready-to-go Configuration Example
@@ -160,14 +175,17 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
              :host github
              :repo "username/emacs-ltex-plus")
 
+  :defer t
+
   :custom
-  ;; To use the online service, set the URI. 
+  ;; To use the online service, set the URI.
   ;; If you prefer the local-only server, you can omit this (it defaults to nil).
-  (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")    
+  (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")
 
   :init
-  ;; Activate the global mode to automatically hook into all supported files.
-  (global-lsp-ltex-plus-mode 1)
+  ;; Install hooks for all supported major modes. The full package loads
+  ;; lazily — only when you first open a relevant file.
+  (lsp-ltex-plus-install-hooks)
 
   :config
   ;; Optional: Automatically use credentials from environment variables.
@@ -178,7 +196,7 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
       (setq lsp-ltex-plus-lt-username user))
     (when (and key (or (null lsp-ltex-plus-lt-api-key) (string-empty-p lsp-ltex-plus-lt-api-key)))
       (setq lsp-ltex-plus-lt-api-key key))))
-  ```
+```
 
 ### Key Settings
 - `lsp-ltex-plus-language`: The language variant to check (e.g., `"en-US"`, `"de-DE"`).
@@ -327,61 +345,35 @@ To enable the patch, add this to your `:custom` block:
 
 ### How does `lsp-ltex-plus-mode` get set up and activated?
 
-Power users may wonder exactly what fires up the mode and when. There are two distinct activation paths.
+The package is split into two files with different load-time profiles:
 
-Set up: ..... 
+- **`lsp-ltex-plus-bootstrap.el`** — tiny, no dependencies. Loaded at `:init` time. Defines the major-mode alist and exposes two autoloaded entry points.
+- **`lsp-ltex-plus.el`** — the full client. Loaded lazily, only when a relevant buffer is first opened.
 
-When `straight.el` (or any package manager) builds `lsp-ltex-plus`, it scans the source file for `;;;###autoload` cookies and writes a `lsp-ltex-plus-autoloads.el` file. This autoloads file is loaded very early at startup — before any `use-package` form is evaluated — and it registers a lightweight stub for `global-lsp-ltex-plus-mode`. The full package is **not** loaded yet; only the symbol is known to Emacs.
+#### Setup: what happens at startup
 
-When `use-package` evaluates the `:init` block and calls `(global-lsp-ltex-plus-mode 1)`, it hits that stub, which triggers loading `lsp-ltex-plus.el`. At the bottom of the file sits:
+When the package manager builds `lsp-ltex-plus`, it scans both files for `;;;###autoload` cookies and writes a single autoloads file. This registers lightweight stubs for three symbols — `lsp-ltex-plus-ensure-major-modes`, `lsp-ltex-plus-install-hooks`, and `lsp-ltex-plus-mode` — very early at startup, before any `use-package` form is evaluated. Neither file is loaded yet.
 
-```elisp
-(with-eval-after-load 'lsp-mode
-  (lsp-ltex-plus--setup))
-```
+When `use-package` evaluates the `:init` block and calls `(lsp-ltex-plus-install-hooks)`, it hits that stub, which loads `lsp-ltex-plus-bootstrap.el` (the tiny file only). The full package is **not** loaded. The function then adds `lsp-ltex-plus-mode` to each major-mode hook listed in `lsp-ltex-plus-major-modes`.
 
-This form is read and executed immediately when the file loads — it registers a callback to run `lsp-ltex-plus--setup` as soon as `lsp-mode` is loaded. If `lsp-mode` is already loaded at that point, the callback fires immediately. If not, it is held until `lsp-mode` loads later. Either way, the client is always registered at the right moment, regardless of load order.
-
-#### Path 1: Emacs starts, `lsp-mode` is already in the user's config
-
-`:init` runs immediately when the use-package form is evaluated, before any package loading.
-
-But calling (global-lsp-ltex-plus-mode 1) there does not require the package to be loaded — it just requires the autoload stub to exist, which it does.
-
-The call sequence is:
+#### Activation: user opens a relevant file
 
 ```
-Emacs starts
-→ straight.el loads lsp-ltex-plus-autoloads.el
-    → (autoload 'global-lsp-ltex-plus-mode "lsp-ltex-plus" ...)  ← stub registered
-→ use-package form is evaluated
-    → :custom sets variables
-    → :init runs → (global-lsp-ltex-plus-mode 1) ← hits the stub
-        → Emacs loads lsp-ltex-plus.el  ← full package loads now
-            → with-eval-after-load 'lsp-mode is registered
-    → :config runs  ← package is now loaded, safe to use anything
-
-```
-
-#### Path 2: No prior `lsp-mode` in the config — user opens a grammar-checked file first
-
-The second path arises when a user opens, say, a Markdown file before `lsp-mode` has ever been loaded. The sequence is:
-
-```
-User opens markdown.md
-  → markdown-mode activates
-  → global-lsp-ltex-plus-mode hook fires → lsp-ltex-plus--global-activate
-      → (lsp-ltex-plus-mode 1)
-          → (lsp) is called  ← lsp-mode.el is loaded here for the first time
-              → (provide 'lsp-mode) fires inside lsp-mode.el
-                  → with-eval-after-load 'lsp-mode callbacks run
-                      → lsp-ltex-plus--setup  ← client is registered
-              → lsp-mode continues, finds the ltex-ls-plus client, activates it
+User opens foo.md
+  → markdown-mode activates → markdown-mode-hook fires
+      → lsp-ltex-plus-mode called ← hits its autoload stub
+          → lsp-ltex-plus.el loads for the first time
+              → (require 'lsp-ltex-plus-bootstrap) → already loaded, no-op
+              → (with-eval-after-load 'lsp-mode ...) registered
+          → lsp-ltex-plus-mode body runs → (lsp) called
+              → lsp-mode.el loads → (provide 'lsp-mode) fires
+                  → lsp-ltex-plus--setup runs ← client registered
+              → lsp-mode finds ltex-ls-plus, activates it
 ```
 
 The crucial detail is that `with-eval-after-load` fires **synchronously inside the `require` call**, at the exact moment `lsp-mode.el` evaluates `(provide 'lsp-mode)`. By the time `(lsp)` returns, the client is already registered. There is no race condition.
 
-This is why `with-eval-after-load` is the right tool here rather than, say, a user-facing hook: it handles both load orders automatically and keeps the internal dependency between `lsp-ltex-plus` and `lsp-mode` entirely transparent to the user.
+Thus, with `with-eval-after-load`, we ensure the correct load orders, while no special configuration is required from the user.
 
 ## Why this package?
 

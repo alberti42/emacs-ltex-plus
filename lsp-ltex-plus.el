@@ -39,6 +39,7 @@
 (require 'lsp-mode)
 (require 'seq)
 (require 'cl-lib)
+(require 'lsp-ltex-plus-bootstrap)
 
 ;;;; -- Customization ----------------------------------------------------------
 
@@ -634,7 +635,7 @@ response IDs."
   (lsp-ltex-plus--log "Registering settings and client...")
   (lsp-ltex-plus--log "Registering ltex-ls-plus client (priority: -1)...")
   (lsp-register-custom-settings
-   `(("ltex.enabled"                             ,#'lsp-ltex-plus--enabled-languages)
+   `(("ltex.enabled"                             ,(lambda () (vconcat (lsp-ltex-plus--enabled-languages))))
      ("ltex.language"                            lsp-ltex-plus-language)
      ("ltex.dictionary"                          lsp-ltex-plus--dictionary)
      ("ltex.enabledRules"                        lsp-ltex-plus-enabled-rules)
@@ -757,16 +758,6 @@ calls `lsp-deferred` to start the server.  It uses
           (lsp-deferred)))
     ;; When disabling, we add the server to disabled clients so it doesn't restart.
     (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
-
-(defun lsp-ltex-plus--global-activate ()
-  "Activate `lsp-ltex-plus-mode' if the major mode is in the allowed list."
-  (when (assoc major-mode lsp-ltex-plus-major-modes)
-    (lsp-ltex-plus-mode 1)))
-
-;;;###autoload
-(define-globalized-minor-mode global-lsp-ltex-plus-mode lsp-ltex-plus-mode
-  lsp-ltex-plus--global-activate
-  :group 'lsp-ltex-plus)
 
 ;; Initialize on lsp-mode load.
 (with-eval-after-load 'lsp-mode
