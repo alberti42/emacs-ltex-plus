@@ -178,16 +178,16 @@ This matters in practice: even if you auto-start the server only in Markdown, yo
   :defer t
   :init
   (lsp-ltex-plus-install-hooks
-    :extend-to '((my-custom-mode . "plaintext"))))
+    :extend-to '((my-custom-mode "plaintext" nil))))
 ```
 
-All three keywords can be combined. `:extend-to` pairs are always added after `:restrict-to` and `:exclude` are applied, so they are never accidentally dropped:
+All three keywords can be combined. `:extend-to` entries are always added after `:restrict-to` and `:exclude` are applied, so they are never accidentally dropped:
 
 ```elisp
 (lsp-ltex-plus-install-hooks
   :restrict-to '(org-mode markdown-mode)
   :exclude     '(markdown-mode)
-  :extend-to   '((my-custom-mode . "plaintext")))
+  :extend-to   '((my-custom-mode "plaintext" nil)))
 ```
 
 If none of the keyword arguments are sufficient and you need to replace the list entirely, set `lsp-ltex-plus-major-modes` directly **before** the `use-package` block (it is a plain `defvar`, not a `defcustom`):

@@ -196,7 +196,7 @@ All three keywords may be combined:
   (lsp-ltex-plus-install-hooks
     :restrict-to \\='(org-mode markdown-mode)
     :exclude     \\='(markdown-mode)       ; hypothetical, for illustration
-    :extend-to   \\='((my-custom-mode . \"plaintext\")))
+    :extend-to   \\='((my-custom-mode \"plaintext\" nil)))
 
 The full lsp-ltex-plus package is loaded lazily — only when one of the hooked
 major modes is first activated.
