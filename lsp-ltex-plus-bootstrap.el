@@ -83,6 +83,7 @@
     (clojure-mode           "clojure"          t)
     (coffee-mode            "coffeescript"     t)
     (common-lisp-mode       "lisp"             t)
+    (emacs-lisp-mode        "lisp"             t)
     (cperl-mode             "perl"             t)
     (csharp-mode            "csharp"           t)
     (csharp-ts-mode         "csharp"           t)

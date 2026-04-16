@@ -556,6 +556,16 @@ response IDs."
   (setq lsp-ltex-plus--start-time (current-time))
   (lsp-ltex-plus--log "Initializing lsp-ltex-plus...")
 
+  ;; Register all our modes into lsp-mode's global language-ID table so that
+  ;; `lsp-buffer-language' returns a value for them and no "Unable to
+  ;; calculate the languageId" warning is emitted.  We only add entries that
+  ;; are not already present; lsp-mode's built-in defaults take precedence.
+  (dolist (entry lsp-ltex-plus-major-modes)
+    (let ((mode    (car entry))
+          (lang-id (cadr entry)))
+      (unless (assq mode lsp-language-id-configuration)
+        (push (cons mode lang-id) lsp-language-id-configuration))))
+
   (when lsp-ltex-plus-apply-kind-first-patch
     (lsp-ltex-plus--apply-lsp-mode-patch))
 
