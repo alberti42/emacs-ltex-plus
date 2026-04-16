@@ -245,6 +245,18 @@ Once active, LTeX+ works just like any other LSP server:
     - Disable a specific rule you don't like.
     - Ignore a false positive.
 
+### Manual activation in any buffer
+
+If you used `:restrict-to` or `:exclude` when calling `lsp-ltex-plus-install-hooks`, some buffers will not have a hook installed. You can still enable grammar checking in any buffer on demand with:
+
+```
+M-x lsp-ltex-plus-activate
+```
+
+If the current major mode is not in `lsp-ltex-plus-major-modes`, you will be prompted for a VS Code language identifier (press `RET` to accept the default `"plaintext"`). The mode is then registered and the grammar checker starts immediately.
+
+> **Why two tables?**  lsp-mode uses `lsp-language-id-configuration` to decide the language ID string sent over the wire (in `textDocument/didOpen` and similar messages). Most common modes — Markdown, Org, LaTeX, plain text — already have entries there from lsp-mode's built-in defaults, so they work without any extra step. Modes outside that list (e.g. `fundamental-mode`) have no default entry, which is why `lsp-ltex-plus-activate` adds the mode to both `lsp-ltex-plus-major-modes` and `lsp-language-id-configuration` simultaneously.
+
 
 ## Customization
 

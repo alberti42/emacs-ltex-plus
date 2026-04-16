@@ -679,7 +679,11 @@ response IDs."
                                          (shell-quote-argument lsp-ltex-plus-ls-plus-executable)
                                          (shell-quote-argument lsp-ltex-plus-server-output-log)))
                          (list lsp-ltex-plus-ls-plus-executable))))
-    :major-modes (mapcar #'car lsp-ltex-plus-major-modes)
+    ;; `:activation-fn' is evaluated on every activation check, so adding
+    ;; entries to `lsp-ltex-plus-major-modes' after client registration
+    ;; (e.g. via `lsp-ltex-plus-activate') takes effect immediately.
+    :activation-fn (lambda (_file-name mode)
+                     (assq mode lsp-ltex-plus-major-modes))
     :language-id (lambda (buf)
                    (cdr (assoc (buffer-local-value 'major-mode buf)
                                lsp-ltex-plus-major-modes)))
