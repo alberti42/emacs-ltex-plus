@@ -208,52 +208,6 @@ of that variable must happen BEFORE this function is called.  With
       (add-hook (intern (concat (symbol-name (car pair)) "-hook"))
                 #'lsp-ltex-plus-mode))))
 
-;;;###autoload
-(defun lsp-ltex-plus-activate (&optional language-id)
-  "Activate lsp-ltex-plus in the current buffer, loading the package if needed.
-
-This is the recommended way to manually enable grammar checking in a buffer
-whose major mode was not covered by `lsp-ltex-plus-install-hooks' — for
-example, when hooks were installed with a narrow `:restrict-to' list and the
-user later wants spell checking in a different buffer.
-
-If the current major mode is already in `lsp-ltex-plus-major-modes', the
-function activates the mode immediately.  Otherwise it prompts for a VS Code
-language identifier (defaulting to \"plaintext\") and registers the mode
-before activating.
-
-Internally, two tables must be kept in sync for lsp-mode to work correctly:
-
-- `lsp-ltex-plus-major-modes' — controls which modes the ltex-ls-plus client
-  considers itself eligible for (checked via `:activation-fn' at activation
-  time).
-
-- `lsp-language-id-configuration' — used by lsp-mode to determine the
-  language ID string sent in the LSP wire protocol (e.g. in
-  `textDocument/didOpen').  Modes already covered by lsp-mode's built-in
-  defaults (markdown, org, latex, …) need no special treatment here; modes
-  outside that list (e.g. `fundamental-mode') must be added explicitly or
-  lsp-mode will emit a warning about an unknown language ID.
-
-This function updates both tables when registering a new mode.
-
-The full lsp-ltex-plus package is loaded on first call if it has not been
-loaded yet.  Any subsequent call in a buffer with an already-registered mode
-is instant."
-  (interactive
-   (unless (assq major-mode lsp-ltex-plus-major-modes)
-     (list (read-string
-            (format "Language ID for %s (RET for \"plaintext\"): " major-mode)
-            nil nil "plaintext"))))
-  (require 'lsp-ltex-plus)
-  (unless (assq major-mode lsp-ltex-plus-major-modes)
-    (let ((lang-id (or language-id "plaintext")))
-      ;; Register with our client's activation check.
-      (push (cons major-mode lang-id) lsp-ltex-plus-major-modes)
-      ;; Register with lsp-mode's language-ID lookup so the wire protocol
-      ;; (textDocument/didOpen etc.) receives the correct languageId string.
-      (push (cons major-mode lang-id) lsp-language-id-configuration)))
-  (lsp-ltex-plus-mode 1))
 
 (provide 'lsp-ltex-plus-bootstrap)
 ;;; lsp-ltex-plus-bootstrap.el ends here

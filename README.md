@@ -250,12 +250,12 @@ Once active, LTeX+ works just like any other LSP server:
 If you used `:restrict-to` or `:exclude` when calling `lsp-ltex-plus-install-hooks`, some buffers will not have a hook installed. You can still enable grammar checking in any buffer on demand with:
 
 ```
-M-x lsp-ltex-plus-activate
+M-x lsp-ltex-plus-mode
 ```
 
-If the current major mode is not in `lsp-ltex-plus-major-modes`, you will be prompted for a VS Code language identifier (press `RET` to accept the default `"plaintext"`). The mode is then registered and the grammar checker starts immediately.
+If the current major mode is not in `lsp-ltex-plus-major-modes`, you will be prompted for a VS Code language identifier (press `RET` to accept the default `"plaintext"`). The mode is then registered and the grammar checker starts immediately. When called from a hook or from Lisp rather than interactively, `"plaintext"` is used silently without prompting.
 
-> **Why two tables?**  lsp-mode uses `lsp-language-id-configuration` to decide the language ID string sent over the wire (in `textDocument/didOpen` and similar messages). Most common modes — Markdown, Org, LaTeX, plain text — already have entries there from lsp-mode's built-in defaults, so they work without any extra step. Modes outside that list (e.g. `fundamental-mode`) have no default entry, which is why `lsp-ltex-plus-activate` adds the mode to both `lsp-ltex-plus-major-modes` and `lsp-language-id-configuration` simultaneously.
+> **Why two tables?**  lsp-mode uses `lsp-language-id-configuration` to decide the language ID string sent over the wire (in `textDocument/didOpen` and similar messages). Most common modes — Markdown, Org, LaTeX, plain text — already have entries there from lsp-mode's built-in defaults, so they work without any extra step. Modes outside that list (e.g. `fundamental-mode`) have no default entry, which is why `lsp-ltex-plus-mode` adds the mode to both `lsp-ltex-plus-major-modes` and `lsp-language-id-configuration` simultaneously.
 
 
 ## Customization

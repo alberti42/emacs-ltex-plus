@@ -747,25 +747,50 @@ response IDs."
 (define-minor-mode lsp-ltex-plus-mode
   "Minor mode for LTEX+ grammar checking via `lsp-mode'.
 
-When enabled, this mode configures the buffer for ltex-ls-plus and
-calls `lsp-deferred` to start the server.  It uses
-`lsp-ltex-plus-buffer-setup-function' to apply buffer-local settings."
+When enabled, this mode configures the buffer for ltex-ls-plus and starts
+the server.  It uses `lsp-ltex-plus-buffer-setup-function' to apply
+buffer-local settings.
+
+If the current major mode is not in `lsp-ltex-plus-major-modes', it is
+registered automatically before the server starts.  When called
+interactively the language identifier is requested from the user (default:
+\"plaintext\"); when called from a hook or from Lisp, \"plaintext\" is used
+silently."
   :lighter " LTeX+"
   :group 'lsp-ltex-plus
   (if lsp-ltex-plus-mode
-      (if (not (executable-find lsp-ltex-plus-ls-plus-executable))
-          (progn
-            (message "[lsp-ltex-plus] Aborting: %s not found on PATH." lsp-ltex-plus-ls-plus-executable)
-            (setq lsp-ltex-plus-mode nil))
-        (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
-        (funcall lsp-ltex-plus-buffer-setup-function)
-        ;; If lsp-mode isn't already active, calling lsp-deferred won't do
-        ;; anything unless another server triggers lsp-mode.  We call (lsp) to
-        ;; ensure lsp-mode starts.
-        (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
-            (lsp)
-          (lsp-deferred)))
-    ;; When disabling, we add the server to disabled clients so it doesn't restart.
+      (progn
+        ;; Register the current major mode if it is not yet known to the client.
+        ;; lsp-mode requires the mode to be present in two places:
+        ;;   1. `lsp-ltex-plus-major-modes' — checked by our :activation-fn.
+        ;;   2. `lsp-language-id-configuration' — used to determine the language
+        ;;      ID string sent in textDocument/didOpen and similar messages.
+        ;; Modes already covered by lsp-mode's built-in defaults (markdown, org,
+        ;; latex, …) need no special treatment for table 2; modes outside that
+        ;; list (e.g. fundamental-mode) must be added explicitly.
+        (unless (assq major-mode lsp-ltex-plus-major-modes)
+          (let ((lang-id (if (called-interactively-p 'any)
+                             (read-string
+                              (format "Language ID for %s (RET for \"plaintext\"): "
+                                      major-mode)
+                              nil nil "plaintext")
+                           "plaintext")))
+            (push (cons major-mode lang-id) lsp-ltex-plus-major-modes)
+            (push (cons major-mode lang-id) lsp-language-id-configuration)))
+        (if (not (executable-find lsp-ltex-plus-ls-plus-executable))
+            (progn
+              (message "[lsp-ltex-plus] Aborting: %s not found on PATH."
+                       lsp-ltex-plus-ls-plus-executable)
+              (setq lsp-ltex-plus-mode nil))
+          (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
+          (funcall lsp-ltex-plus-buffer-setup-function)
+          ;; If lsp-mode isn't already active, calling lsp-deferred won't do
+          ;; anything unless another server triggers lsp-mode.  We call (lsp) to
+          ;; ensure lsp-mode starts.
+          (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
+              (lsp)
+            (lsp-deferred))))
+    ;; When disabling, add the server to disabled clients to prevent auto-restart.
     (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
 
 ;; Initialize on lsp-mode load.
