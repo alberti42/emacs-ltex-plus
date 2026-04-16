@@ -199,18 +199,22 @@ All three keywords may be combined:
 The full lsp-ltex-plus package is loaded lazily — only when one of the hooked
 major modes is first activated.
 
-Because `lsp-ltex-plus-major-modes\\=' is read at call time, any customization
-of that variable must happen BEFORE this function is called.  With
-`use-package\\=', place such customization in `:custom\\=' (which runs before
-`:init\\='):
+Because `lsp-ltex-plus-major-modes\\=' is read at call time, any direct
+modification of that variable must happen BEFORE this function is called.
+Since it is a plain `defvar\\=' (not a `defcustom\\='), use `setq\\=' before
+the `use-package\\=' block:
+
+  (setq lsp-ltex-plus-major-modes
+        \\='((markdown-mode \"markdown\" nil)
+          (org-mode      \"org\"      nil)))
 
   (use-package lsp-ltex-plus
     :defer t
-    :custom
-    (lsp-ltex-plus-major-modes \\='((markdown-mode \"markdown\" nil)
-                                   (org-mode      \"org\"      nil)))
     :init
-    (lsp-ltex-plus-install-hooks))"
+    (lsp-ltex-plus-install-hooks))
+
+In most cases the keyword arguments above are sufficient and direct
+modification of `lsp-ltex-plus-major-modes\\=' is not needed."
   (let ((pairs (if restrict-to
                    (delq nil (mapcar (lambda (m) (assq m lsp-ltex-plus-major-modes))
                                      restrict-to))

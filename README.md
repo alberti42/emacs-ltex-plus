@@ -187,15 +187,16 @@ All three keywords can be combined. `:extend-to` pairs are always added after `:
   :extend-to   '((my-custom-mode . "plaintext")))
 ```
 
-To **replace the default list entirely**, set `lsp-ltex-plus-major-modes` in `:custom` (which runs before `:init`):
+If none of the keyword arguments are sufficient and you need to replace the list entirely, set `lsp-ltex-plus-major-modes` directly **before** the `use-package` block (it is a plain `defvar`, not a `defcustom`):
 
 ```elisp
+(setq lsp-ltex-plus-major-modes
+      '((markdown-mode "markdown" nil)
+        (org-mode      "org"      nil)
+        (text-mode     "plaintext" nil)))
+
 (use-package lsp-ltex-plus
   :defer t
-  :custom
-  (lsp-ltex-plus-major-modes '((markdown-mode "markdown" nil)
-                               (org-mode      "org"      nil)
-                               (text-mode     "plaintext" nil)))
   :init
   (lsp-ltex-plus-install-hooks))
 ```
