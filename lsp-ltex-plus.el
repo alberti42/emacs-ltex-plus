@@ -695,13 +695,19 @@ silently."
   (if lsp-ltex-plus-mode
       (progn
         ;; Register the current major mode if it is not yet known to the client.
-        ;; lsp-mode requires the mode to be present in two places:
-        ;;   1. `lsp-ltex-plus-major-modes' — checked by our :activation-fn.
-        ;;   2. `lsp-language-id-configuration' — used to determine the language
-        ;;      ID string sent in textDocument/didOpen and similar messages.
-        ;; Modes already covered by lsp-mode's built-in defaults (markdown, org,
-        ;; latex, …) need no special treatment for table 2; any mode not in
-        ;; those defaults must be added explicitly.
+        ;; Two tables must be updated:
+        ;;   1. `lsp-ltex-plus-major-modes' — our own registry, read by the
+        ;;      :activation-fn and :language-id lambda in lsp-register-client.
+        ;;      This controls which buffers the client accepts and what language
+        ;;      ID is sent in textDocument/didOpen.
+        ;;   2. `lsp-language-id-configuration' — lsp-mode's own lookup table,
+        ;;      used solely by `lsp-buffer-language' for bookkeeping and to
+        ;;      suppress an "Unable to calculate the languageId" warning.  It
+        ;;      does NOT affect the language ID sent over the wire (our
+        ;;      :language-id lambda handles that).  Modes already in lsp-mode's
+        ;;      built-in defaults (markdown, org, latex, …) need no entry here;
+        ;;      any mode absent from those defaults must be added to silence the
+        ;;      warning.
         (unless (assq major-mode lsp-ltex-plus-major-modes)
           (let ((lang-id (if (called-interactively-p 'any)
                              (read-string
