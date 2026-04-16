@@ -710,46 +710,56 @@ silently."
   :lighter " LTeX+"
   :group 'lsp-ltex-plus
   (if lsp-ltex-plus-mode
-      (progn
-        ;; Register the current major mode if it is not yet known to the client.
-        ;; Two tables must be updated:
-        ;;   1. `lsp-ltex-plus-major-modes' — our own registry, read by the
-        ;;      :activation-fn and :language-id lambda in lsp-register-client.
-        ;;      This controls which buffers the client accepts and what language
-        ;;      ID is sent in textDocument/didOpen.
-        ;;   2. `lsp-language-id-configuration' — lsp-mode's own lookup table,
-        ;;      used solely by `lsp-buffer-language' for bookkeeping and to
-        ;;      suppress an "Unable to calculate the languageId" warning.  It
-        ;;      does NOT affect the language ID sent over the wire (our
-        ;;      :language-id lambda handles that).  Modes already in lsp-mode's
-        ;;      built-in defaults (markdown, org, latex, …) need no entry here;
-        ;;      any mode absent from those defaults must be added to silence the
-        ;;      warning.
-        (unless (assq major-mode lsp-ltex-plus-major-modes)
-          (let ((lang-id (if (called-interactively-p 'any)
-                             (read-string
-                              (format "Language ID for %s (RET for \"plaintext\"): "
-                                      major-mode)
-                              nil nil "plaintext")
-                           "plaintext")))
-            ;; New entries added interactively are treated as markup (nil),
-            ;; since unknown modes are typically plain-text writing contexts.
-            (push (list major-mode lang-id nil) lsp-ltex-plus-major-modes)
-            ;; lsp-language-id-configuration uses plain cons pairs.
-            (push (cons major-mode lang-id) lsp-language-id-configuration)))
-        (if (not (executable-find lsp-ltex-plus-ls-plus-executable))
+      (let* ((entry (assq major-mode lsp-ltex-plus-major-modes))
+             (programming-p (and entry (nth 2 entry))))
+        (if (and programming-p (not lsp-ltex-plus-check-programming-languages))
+            ;; Programming-language mode with checking disabled: do not activate.
+            ;; When called interactively, inform the user how to opt in.
             (progn
-              (message "[lsp-ltex-plus] Aborting: %s not found on PATH."
-                       lsp-ltex-plus-ls-plus-executable)
+              (when (called-interactively-p 'any)
+                (message (concat "[lsp-ltex-plus] Grammar checking in programming languages "
+                                 "is disabled.  Set `lsp-ltex-plus-check-programming-languages'"
+                                 " to t to enable it.")))
               (setq lsp-ltex-plus-mode nil))
-          (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
-          (funcall lsp-ltex-plus-buffer-setup-function)
-          ;; If lsp-mode isn't already active, calling lsp-deferred won't do
-          ;; anything unless another server triggers lsp-mode.  We call (lsp) to
-          ;; ensure lsp-mode starts.
-          (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
-              (lsp)
-            (lsp-deferred))))
+          ;; Register the current major mode if it is not yet known to the client.
+          ;; Two tables must be updated:
+          ;;   1. `lsp-ltex-plus-major-modes' — our own registry, read by the
+          ;;      :activation-fn and :language-id lambda in lsp-register-client.
+          ;;      This controls which buffers the client accepts and what language
+          ;;      ID is sent in textDocument/didOpen.
+          ;;   2. `lsp-language-id-configuration' — lsp-mode's own lookup table,
+          ;;      used solely by `lsp-buffer-language' for bookkeeping and to
+          ;;      suppress an "Unable to calculate the languageId" warning.  It
+          ;;      does NOT affect the language ID sent over the wire (our
+          ;;      :language-id lambda handles that).  Modes already in lsp-mode's
+          ;;      built-in defaults (markdown, org, latex, …) need no entry here;
+          ;;      any mode absent from those defaults must be added to silence the
+          ;;      warning.
+          (unless entry
+            (let ((lang-id (if (called-interactively-p 'any)
+                               (read-string
+                                (format "Language ID for %s (RET for \"plaintext\"): "
+                                        major-mode)
+                                nil nil "plaintext")
+                             "plaintext")))
+              ;; New entries added interactively are treated as markup (nil),
+              ;; since unknown modes are typically plain-text writing contexts.
+              (push (list major-mode lang-id nil) lsp-ltex-plus-major-modes)
+              ;; lsp-language-id-configuration uses plain cons pairs.
+              (push (cons major-mode lang-id) lsp-language-id-configuration)))
+          (if (not (executable-find lsp-ltex-plus-ls-plus-executable))
+              (progn
+                (message "[lsp-ltex-plus] Aborting: %s not found on PATH."
+                         lsp-ltex-plus-ls-plus-executable)
+                (setq lsp-ltex-plus-mode nil))
+            (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
+            (funcall lsp-ltex-plus-buffer-setup-function)
+            ;; If lsp-mode isn't already active, calling lsp-deferred won't do
+            ;; anything unless another server triggers lsp-mode.  We call (lsp) to
+            ;; ensure lsp-mode starts.
+            (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
+                (lsp)
+              (lsp-deferred)))))
     ;; When disabling, add the server to disabled clients to prevent auto-restart.
     (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
 
