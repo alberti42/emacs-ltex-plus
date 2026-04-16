@@ -74,7 +74,7 @@ detailed log files in /tmp."
   "When non-nil, enable grammar checking in programming language comments.
 
 By default this is nil, matching LTeX+\\='s own default: only markup languages
-(LaTeX, Markdown, Org, …) are checked.  Setting this to t adds all programming
+\(LaTeX, Markdown, Org, …) are checked.  Setting this to t adds all programming
 language IDs from `lsp-ltex-plus-major-modes\\=' to the `ltex.enabled\\=' setting
 sent to the server, enabling comment checking in 30+ languages.
 
