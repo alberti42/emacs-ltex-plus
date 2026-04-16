@@ -70,98 +70,19 @@ detailed log files in /tmp."
   :type 'file
   :group 'lsp-ltex-plus)
 
-(defcustom lsp-ltex-plus-major-modes
-  '((asciidoc-mode          . "asciidoc")
-    (bibtex-mode            . "bibtex")
-    (c-mode                 . "c")
-    (c-ts-mode              . "c")
-    (c++-mode               . "cpp")
-    (c++-ts-mode            . "cpp")
-    (clojure-mode           . "clojure")
-    (common-lisp-mode       . "lisp")
-    (context-mode           . "context")
-    (coffee-mode            . "coffeescript")
-    (cperl-mode             . "perl")
-    (csharp-mode            . "csharp")
-    (csharp-ts-mode         . "csharp")
-    (dart-mode              . "dart")
-    (elixir-mode            . "elixier")
-    (elixir-ts-mode         . "elixier")
-    (elm-mode               . "elm")
-    (erlang-mode            . "erlang")
-    (ess-r-mode             . "r")
-    (f90-mode               . "fortran-modern")
-    (fortran-mode           . "fortran-modern")
-    (fsharp-mode            . "fsharp")
-    (gfm-mode               . "markdown")
-    (git-commit-mode        . "plaintext")
-    (go-mode                . "go")
-    (go-ts-mode             . "go")
-    (groovy-mode            . "groovy")
-    (haskell-mode           . "haskell")
-    (html-mode              . "html")
-    (java-mode              . "java")
-    (java-ts-mode           . "java")
-    (javascript-mode        . "javascript")
-    (js-mode                . "javascript")
-    (js-jsx-mode            . "javascriptreact")
-    (js-ts-mode             . "javascript")
-    (js2-mode               . "javascript")
-    (julia-mode             . "julia")
-    (kotlin-mode            . "kotlin")
-    (latex-mode             . "latex")
-    (LaTeX-mode             . "latex")
-    (lisp-mode              . "lisp")
-    (lua-mode               . "lua")
-    (lua-ts-mode            . "lua")
-    (markdown-mode          . "markdown")
-    (matlab-mode            . "matlab")
-    (mdx-mode               . "mdx")
-    (norg-mode              . "neorg")
-    (org-mode               . "org")
-    (perl-mode              . "perl")
-    (perl6-mode             . "perl6")
-    (php-mode               . "php")
-    (plain-tex-mode         . "latex")
-    (poly-noweb+r-mode      . "rsweave")
-    (powershell-mode        . "powershell")
-    (puppet-mode            . "puppet")
-    (python-mode            . "python")
-    (python-ts-mode         . "python")
-    (quarto-mode            . "quarto")
-    (raku-mode              . "perl6")
-    (rjsx-mode              . "javascriptreact")
-    (Rnw-mode               . "rsweave")
-    (rst-mode               . "restructuredtext")
-    (ruby-mode              . "ruby")
-    (ruby-ts-mode           . "ruby")
-    (rust-mode              . "rust")
-    (rust-ts-mode           . "rust")
-    (rustic-mode            . "rust")
-    (scala-mode             . "scala")
-    (sh-mode                . "shellscript")
-    (bash-ts-mode           . "shellscript")
-    (sql-mode               . "sql")
-    (swift-mode             . "swift")
-    (tex-mode               . "latex")
-    (text-mode              . "plaintext")
-    (tsx-ts-mode            . "typescriptreact")
-    (typescript-mode        . "typescript")
-    (typescript-ts-mode     . "typescript")
-    (typescript-tsx-mode    . "typescriptreact")
-    (typst-mode             . "typ")
-    (typst-ts-mode          . "typ")
-    (verilog-mode           . "verilog")
-    (visual-basic-mode      . "vb"))
-  "Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation.
-This decides where LTeX+ is active.  Each entry enables the minor mode
-for that major mode and registers its language identifier with `lsp-mode'.
+(defcustom lsp-ltex-plus-check-programming-languages nil
+  "When non-nil, enable grammar checking in programming language comments.
 
-The language-id strings are VS Code language identifiers, which are also
-the identifiers used by the LSP specification.  The canonical list is at
-URL `https://code.visualstudio.com/docs/languages/identifiers'.
-Extensions can define additional identifiers beyond that list."
-  :type '(alist :key-type symbol :value-type string)
+By default this is nil, matching LTeX+\\='s own default: only markup languages
+(LaTeX, Markdown, Org, …) are checked.  Setting this to t adds all programming
+language IDs from `lsp-ltex-plus-major-modes\\=' to the `ltex.enabled\\=' setting
+sent to the server, enabling comment checking in 30+ languages.
+
+Note: LTeX+ checks only comments whose start delimiter is preceded by
+whitespace and followed by a space — this minimises false positives from
+commented-out code.  Python comments are parsed as reStructuredText; all
+others are parsed as Markdown."
+  :type 'boolean
   :group 'lsp-ltex-plus)
 
 (defcustom lsp-ltex-plus-language "en-US"
@@ -380,8 +301,15 @@ FMT is the format string, and ARGS are the arguments for it."
      (lsp-ltex-plus--log-to-buffer (format ,fmt ,@args))))
 
 (defun lsp-ltex-plus--enabled-languages ()
-  "Return the list of unique language IDs from `lsp-ltex-plus-major-modes`."
-  (seq-uniq (mapcar #'cdr lsp-ltex-plus-major-modes) #'string=))
+  "Return the language IDs to send in `ltex.enabled'.
+When `lsp-ltex-plus-check-programming-languages' is nil (the default),
+only IDs from markup entries (PROGRAMMING-P = nil) are returned, matching
+LTeX+\\='s own default.  When non-nil, all IDs are returned."
+  (let ((entries (if lsp-ltex-plus-check-programming-languages
+                     lsp-ltex-plus-major-modes
+                   (seq-filter (lambda (entry) (not (nth 2 entry)))
+                               lsp-ltex-plus-major-modes))))
+    (seq-uniq (mapcar #'cadr entries) #'string=)))
 
 ;;;; -- Dictionary Management --------------------------------------------------
 
@@ -687,7 +615,7 @@ response IDs."
     :activation-fn (lambda (_file-name mode)
                      (assq mode lsp-ltex-plus-major-modes))
     :language-id (lambda (buf)
-                   (cdr (assoc (buffer-local-value 'major-mode buf)
+                   (cadr (assq (buffer-local-value 'major-mode buf)
                                lsp-ltex-plus-major-modes)))
     :server-id 'ltex-ls-plus
     ;; :add-on? t tells lsp-mode to start this client alongside any already-
@@ -781,7 +709,10 @@ silently."
                                       major-mode)
                               nil nil "plaintext")
                            "plaintext")))
-            (push (cons major-mode lang-id) lsp-ltex-plus-major-modes)
+            ;; New entries added interactively are treated as markup (nil),
+            ;; since unknown modes are typically plain-text writing contexts.
+            (push (list major-mode lang-id nil) lsp-ltex-plus-major-modes)
+            ;; lsp-language-id-configuration uses plain cons pairs.
             (push (cons major-mode lang-id) lsp-language-id-configuration)))
         (if (not (executable-find lsp-ltex-plus-ls-plus-executable))
             (progn

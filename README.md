@@ -2,7 +2,7 @@
 
 `lsp-ltex-plus` is a lightweight [lsp-mode](https://github.com/emacs-lsp/lsp-mode) client for **LTeX+**, a powerful grammar and spell checker powered by [LanguageTool](https://languagetool.org/).
 
-This package allows you to have professional-grade grammar checking in Emacs while you write Markdown, LaTeX, Org-mode, and more. It is designed to be an "add-on" server, meaning it runs quietly in the background alongside your existing programming language servers.
+This package allows you to have professional-grade grammar checking in Emacs while you write Markdown, LaTeX, Org-mode, and more — and also checks grammar and spelling inside comments and string literals of 30+ programming languages. It is designed to be an "add-on" server, meaning it runs quietly in the background alongside your existing language servers without interfering with them.
 
 ![LTeX+ in action](screenshot.jpg)
 *LTeX+ in action: `C-c l a a` activates the LSP actions, allowing you to choose the suitable correction (e.g., fixing "your" to "you're" in the example above). The key binding can be customized by configuring the `lsp-mode` package.*
@@ -35,6 +35,7 @@ LTeX+ can operate in two distinct ways, depending on your needs:
 - **Bi-directional Support:** Handles advanced server requests (like dynamic configuration fetching) safely.
 - **Highly Configurable:** Easily switch languages, enable "picky" grammar rules, or connect to a premium LanguageTool account.
 - **Wide Language Support:** Pre-configured for Markdown, LaTeX, Org, RestructuredText, HTML, BibTeX, and many others.
+- **Programming Language Support:** Optionally checks grammar and spelling in comments of 30+ programming languages (Python, C, C++, Rust, Java, …), running transparently alongside the primary language server thanks to its add-on design. Disabled by default (matching LTeX+), opt-in via `lsp-ltex-plus-check-programming-languages`.
 
 ## Prerequisites
 
@@ -192,9 +193,9 @@ To **replace the default list entirely**, set `lsp-ltex-plus-major-modes` in `:c
 (use-package lsp-ltex-plus
   :defer t
   :custom
-  (lsp-ltex-plus-major-modes '((markdown-mode . "markdown")
-                               (org-mode      . "org")
-                               (text-mode     . "plaintext")))
+  (lsp-ltex-plus-major-modes '((markdown-mode "markdown" nil)
+                               (org-mode      "org"      nil)
+                               (text-mode     "plaintext" nil)))
   :init
   (lsp-ltex-plus-install-hooks))
 ```
@@ -288,6 +289,7 @@ You can configure these using `:custom` in `use-package`:
 | `lsp-ltex-plus-ls-plus-executable` | The name or path of the ltex-ls-plus executable. | |
 | `lsp-ltex-plus-debug` | When non-nil, enable verbose logging and JSON-RPC tracing. | |
 | `lsp-ltex-plus-major-modes` | Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation. | |
+| `lsp-ltex-plus-check-programming-languages` | When non-nil, enable grammar checking in comments of programming languages (disabled by default, matching LTeX+). | |
 | `lsp-ltex-plus-language` | The language (e.g., "en-US") LanguageTool should check against. | X |
 | `lsp-ltex-plus-enabled-rules` | Lists of rules that should be enabled (language-specific). | X |
 | `lsp-ltex-plus-disabled-rules` | Lists of rules that should be disabled (language-specific). | X |

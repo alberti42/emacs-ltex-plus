@@ -46,96 +46,110 @@
 ;; who want a narrower set can pass `:restrict-to' or `:exclude' to
 ;; `lsp-ltex-plus-install-hooks' without touching this variable at all.
 (defvar lsp-ltex-plus-major-modes
-  '((asciidoc-mode          . "asciidoc")
-    (bibtex-mode            . "bibtex")
-    (c-mode                 . "c")
-    (c-ts-mode              . "c")
-    (c++-mode               . "cpp")
-    (c++-ts-mode            . "cpp")
-    (clojure-mode           . "clojure")
-    (common-lisp-mode       . "lisp")
-    (context-mode           . "context")
-    (coffee-mode            . "coffeescript")
-    (cperl-mode             . "perl")
-    (csharp-mode            . "csharp")
-    (csharp-ts-mode         . "csharp")
-    (dart-mode              . "dart")
-    (elixir-mode            . "elixier")
-    (elixir-ts-mode         . "elixier")
-    (elm-mode               . "elm")
-    (erlang-mode            . "erlang")
-    (ess-r-mode             . "r")
-    (f90-mode               . "fortran-modern")
-    (fortran-mode           . "fortran-modern")
-    (fsharp-mode            . "fsharp")
-    (gfm-mode               . "markdown")
-    (git-commit-mode        . "plaintext")
-    (go-mode                . "go")
-    (go-ts-mode             . "go")
-    (groovy-mode            . "groovy")
-    (haskell-mode           . "haskell")
-    (html-mode              . "html")
-    (java-mode              . "java")
-    (java-ts-mode           . "java")
-    (javascript-mode        . "javascript")
-    (js-mode                . "javascript")
-    (js-jsx-mode            . "javascriptreact")
-    (js-ts-mode             . "javascript")
-    (js2-mode               . "javascript")
-    (julia-mode             . "julia")
-    (kotlin-mode            . "kotlin")
-    (latex-mode             . "latex")
-    (LaTeX-mode             . "latex")
-    (lisp-mode              . "lisp")
-    (lua-mode               . "lua")
-    (lua-ts-mode            . "lua")
-    (markdown-mode          . "markdown")
-    (matlab-mode            . "matlab")
-    (mdx-mode               . "mdx")
-    (norg-mode              . "neorg")
-    (org-mode               . "org")
-    (perl-mode              . "perl")
-    (perl6-mode             . "perl6")
-    (php-mode               . "php")
-    (plain-tex-mode         . "latex")
-    (poly-noweb+r-mode      . "rsweave")
-    (powershell-mode        . "powershell")
-    (puppet-mode            . "puppet")
-    (python-mode            . "python")
-    (python-ts-mode         . "python")
-    (quarto-mode            . "quarto")
-    (raku-mode              . "perl6")
-    (rjsx-mode              . "javascriptreact")
-    (Rnw-mode               . "rsweave")
-    (rst-mode               . "restructuredtext")
-    (ruby-mode              . "ruby")
-    (ruby-ts-mode           . "ruby")
-    (rust-mode              . "rust")
-    (rust-ts-mode           . "rust")
-    (rustic-mode            . "rust")
-    (scala-mode             . "scala")
-    (sh-mode                . "shellscript")
-    (bash-ts-mode           . "shellscript")
-    (sql-mode               . "sql")
-    (swift-mode             . "swift")
-    (tex-mode               . "latex")
-    (text-mode              . "plaintext")
-    (tsx-ts-mode            . "typescriptreact")
-    (typescript-mode        . "typescript")
-    (typescript-ts-mode     . "typescript")
-    (typescript-tsx-mode    . "typescriptreact")
-    (typst-mode             . "typ")
-    (typst-ts-mode          . "typ")
-    (verilog-mode           . "verilog")
-    (visual-basic-mode      . "vb"))
-  "Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation.
-This decides where LTeX+ is active.  Each entry enables the minor mode
-for that major mode and registers its language identifier with `lsp-mode'.
+  ;; Each entry is (MAJOR-MODE LANGUAGE-ID PROGRAMMING-P).
+  ;; PROGRAMMING-P is nil for markup/writing languages (checked by default)
+  ;; and t for programming languages (opt-in via
+  ;; `lsp-ltex-plus-check-programming-languages').
+  ;;
+  ;; Markup languages (PROGRAMMING-P = nil)
+  '((asciidoc-mode          "asciidoc"         nil)
+    (bibtex-mode            "bibtex"           nil)
+    (context-mode           "context"          nil)
+    (gfm-mode               "markdown"         nil)
+    (git-commit-mode        "plaintext"        nil)
+    (html-mode              "html"             nil)
+    (latex-mode             "latex"            nil)
+    (LaTeX-mode             "latex"            nil)
+    (markdown-mode          "markdown"         nil)
+    (mdx-mode               "mdx"              nil)
+    (norg-mode              "neorg"            nil)
+    (org-mode               "org"              nil)
+    (plain-tex-mode         "latex"            nil)
+    (poly-noweb+r-mode      "rsweave"          nil)
+    (quarto-mode            "quarto"           nil)
+    (Rnw-mode               "rsweave"          nil)
+    (rst-mode               "restructuredtext" nil)
+    (tex-mode               "latex"            nil)
+    (text-mode              "plaintext"        nil)
+    (typst-mode             "typ"              nil)
+    (typst-ts-mode          "typ"              nil)
+    ;; Programming languages (PROGRAMMING-P = t)
+    (bash-ts-mode           "shellscript"      t)
+    (c-mode                 "c"                t)
+    (c-ts-mode              "c"                t)
+    (c++-mode               "cpp"              t)
+    (c++-ts-mode            "cpp"              t)
+    (clojure-mode           "clojure"          t)
+    (coffee-mode            "coffeescript"     t)
+    (common-lisp-mode       "lisp"             t)
+    (cperl-mode             "perl"             t)
+    (csharp-mode            "csharp"           t)
+    (csharp-ts-mode         "csharp"           t)
+    (dart-mode              "dart"             t)
+    (elixir-mode            "elixier"          t)
+    (elixir-ts-mode         "elixier"          t)
+    (elm-mode               "elm"              t)
+    (erlang-mode            "erlang"           t)
+    (ess-r-mode             "r"                t)
+    (f90-mode               "fortran-modern"   t)
+    (fortran-mode           "fortran-modern"   t)
+    (fsharp-mode            "fsharp"           t)
+    (go-mode                "go"               t)
+    (go-ts-mode             "go"               t)
+    (groovy-mode            "groovy"           t)
+    (haskell-mode           "haskell"          t)
+    (java-mode              "java"             t)
+    (java-ts-mode           "java"             t)
+    (javascript-mode        "javascript"       t)
+    (js-mode                "javascript"       t)
+    (js-jsx-mode            "javascriptreact"  t)
+    (js-ts-mode             "javascript"       t)
+    (js2-mode               "javascript"       t)
+    (julia-mode             "julia"            t)
+    (kotlin-mode            "kotlin"           t)
+    (lisp-mode              "lisp"             t)
+    (lua-mode               "lua"              t)
+    (lua-ts-mode            "lua"              t)
+    (matlab-mode            "matlab"           t)
+    (perl-mode              "perl"             t)
+    (perl6-mode             "perl6"            t)
+    (php-mode               "php"              t)
+    (powershell-mode        "powershell"       t)
+    (puppet-mode            "puppet"           t)
+    (python-mode            "python"           t)
+    (python-ts-mode         "python"           t)
+    (raku-mode              "perl6"            t)
+    (rjsx-mode              "javascriptreact"  t)
+    (ruby-mode              "ruby"             t)
+    (ruby-ts-mode           "ruby"             t)
+    (rust-mode              "rust"             t)
+    (rust-ts-mode           "rust"             t)
+    (rustic-mode            "rust"             t)
+    (scala-mode             "scala"            t)
+    (sh-mode                "shellscript"      t)
+    (sql-mode               "sql"              t)
+    (swift-mode             "swift"            t)
+    (tsx-ts-mode            "typescriptreact"  t)
+    (typescript-mode        "typescript"       t)
+    (typescript-ts-mode     "typescript"       t)
+    (typescript-tsx-mode    "typescriptreact"  t)
+    (verilog-mode           "verilog"          t)
+    (visual-basic-mode      "vb"               t))
+  "List of (MAJOR-MODE LANGUAGE-ID PROGRAMMING-P) entries for lsp-ltex-plus.
 
-The language-id strings are VS Code language identifiers, which are also
-the identifiers used by the LSP specification.  The canonical list is at
-URL `https://code.visualstudio.com/docs/languages/identifiers'.
-Extensions can define additional identifiers beyond that list.
+Each entry registers a major mode with its VS Code language identifier and
+category:
+
+  MAJOR-MODE    — Emacs major mode symbol.
+  LANGUAGE-ID   — VS Code language identifier string, used in the LSP wire
+                  protocol and by LTeX+ to select grammar rules.  The
+                  canonical list is at URL
+                  `https://code.visualstudio.com/docs/languages/identifiers'.
+  PROGRAMMING-P — nil for markup/writing languages (LaTeX, Markdown, Org, …),
+                  which LTeX+ checks by default.  t for programming languages
+                  (Python, C, Rust, …), which LTeX+ checks only in comments
+                  and only when `lsp-ltex-plus-check-programming-languages'
+                  is non-nil.
 
 This variable is intentionally not autoloaded; it is defined here so that
 `lsp-ltex-plus-install-hooks' can read it at startup without loading the full
@@ -166,13 +180,14 @@ The effective set of modes is built in three steps:
    (lsp-ltex-plus-install-hooks
      :exclude \\='(python-mode c-mode c++-mode))
 
-3. EXTEND-TO — additions.  If non-nil, must be a list of (MAJOR-MODE .
-   LANGUAGE-ID) pairs following the same format as `lsp-ltex-plus-major-modes\\='.
-   These pairs are appended after steps 1 and 2, so they are never excluded.
-   Use this to hook modes that are absent from the built-in alist:
+3. EXTEND-TO — additions.  If non-nil, must be a list of
+   (MAJOR-MODE LANGUAGE-ID PROGRAMMING-P) entries following the same format
+   as `lsp-ltex-plus-major-modes\\='.  These entries are appended after steps
+   1 and 2, so they are never excluded.  Use this to hook modes that are
+   absent from the built-in list:
 
    (lsp-ltex-plus-install-hooks
-     :extend-to \\='((my-custom-mode . \"plaintext\")))
+     :extend-to \\='((my-custom-mode \"plaintext\" nil)))
 
 All three keywords may be combined:
 
@@ -192,8 +207,8 @@ of that variable must happen BEFORE this function is called.  With
   (use-package lsp-ltex-plus
     :defer t
     :custom
-    (lsp-ltex-plus-major-modes \\='((markdown-mode . \"markdown\")
-                                   (org-mode      . \"org\")))
+    (lsp-ltex-plus-major-modes \\='((markdown-mode \"markdown\" nil)
+                                   (org-mode      \"org\"      nil)))
     :init
     (lsp-ltex-plus-install-hooks))"
   (let ((pairs (if restrict-to
