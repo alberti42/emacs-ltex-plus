@@ -222,6 +222,12 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
   ;; If you prefer the local-only server, you can omit this (it defaults to nil).
   (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")
 
+  ;; Opt in to grammar checking inside programming language comments.
+  ;; By default only markup languages (LaTeX, Markdown, Org, …) are checked.
+  ;; Set to t to also check comments in Python, C, Rust, and all other
+  ;; programming languages in lsp-ltex-plus-major-modes.
+  (lsp-ltex-plus-check-programming-languages t)
+
   :init
   ;; Install hooks for all supported major modes. The full package loads
   ;; lazily — only when you first open a relevant file.
