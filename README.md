@@ -139,14 +139,17 @@ The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hoo
 
 ### Customizing Supported Modes
 
-`lsp-ltex-plus-major-modes` is an alist of `(major-mode . language-id)` pairs that serves as the **client's registry of supported modes**. It has two distinct roles:
+`lsp-ltex-plus-major-modes` is the **client's registry of supported modes**. Each entry is a three-element list `(major-mode language-id programming-p)`:
 
-1. **What the client supports** — the `ltex-ls-plus` client will accept and grammar-check any buffer whose major mode appears in this alist. This is checked at activation time via the `:activation-fn` registered with `lsp-mode`, so the alist is consulted dynamically, not frozen at startup.
-2. **The language identifier sent over the wire** — the `cdr` of each entry is a **VS Code language identifier**, the same string the LSP specification uses in `textDocument/didOpen` and similar messages. LTeX+ uses it to select the correct grammar rules. The canonical list of identifiers is at the [VS Code language identifiers page](https://code.visualstudio.com/docs/languages/identifiers).
+- `major-mode` — the Emacs major mode symbol.
+- `language-id` — a **VS Code language identifier**, the string LTeX+ uses to select the correct grammar rules and that the LSP protocol sends in `textDocument/didOpen`. The canonical list is at the [VS Code language identifiers page](https://code.visualstudio.com/docs/languages/identifiers).
+- `programming-p` — `nil` for markup and writing modes (LaTeX, Markdown, Org, …), `t` for programming languages (Python, C, Rust, …). This flag controls whether the mode is checked by default or only when `lsp-ltex-plus-check-programming-languages` is enabled.
 
-**Hook installation is a separate concern.** `lsp-ltex-plus-install-hooks` reads `lsp-ltex-plus-major-modes` to decide which major-mode hooks trigger the auto-start of the server — but its keyword arguments (`:restrict-to`, `:exclude`, `:extend-to`) only affect which hooks are installed. They never modify `lsp-ltex-plus-major-modes` itself, which always retains the full registry of supported modes.
+The registry serves two purposes: it tells the client which buffers to accept, and it provides the language ID to send over the wire. Both are looked up dynamically at activation time, so changes take effect immediately without restarting the server.
 
-This means that even if you restrict hook installation to just a few modes, you can still call `M-x lsp-ltex-plus-mode` manually in any other supported mode and the client will activate without prompting — because that mode is already in the registry.
+`lsp-ltex-plus-install-hooks` reads `lsp-ltex-plus-major-modes` to decide which major-mode hooks auto-start the server, but its keyword arguments (`:restrict-to`, `:exclude`, `:extend-to`) only control which hooks get installed — they never modify `lsp-ltex-plus-major-modes` itself. The full registry always stays intact.
+
+This matters in practice: even if you auto-start the server only in Markdown, you can still call `M-x lsp-ltex-plus-mode` in an Org or Python buffer and the client activates without any prompt — because those modes are already in the registry.
 
 **Activate only a specific subset** with `:restrict-to` (whitelist):
 
