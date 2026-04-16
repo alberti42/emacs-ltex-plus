@@ -541,7 +541,9 @@ Items in vectors are merged and deduplicated using `string=`."
 (defun lsp-core--parser-on-message-patch (json-data workspace)
   "Patched `lsp--parser-on-message' to prioritize \\='method\\=' (Kind-First routing).
 
-This prevents server-initiated requests from being misrouted as responses
+JSON-DATA is the parsed JSON message; WORKSPACE is the active lsp workspace.
+
+This patch prevents server-initiated requests from being misrouted as responses
 to client requests when IDs collide."
   ;; Define a local helper for JSON parsing. This is an auxiliary function
   ;; used exclusively by the patch to ensure the package remains standalone.
