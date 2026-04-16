@@ -24,6 +24,8 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
 ;; lsp-ltex-plus-mode is defined in lsp-ltex-plus.el, which loads lazily.
 ;; This declaration silences the byte-compiler without creating a load-time dependency.
 (declare-function lsp-ltex-plus-mode "lsp-ltex-plus")
@@ -41,8 +43,8 @@
 ;; packages ask the user to opt in to each major mode individually, but that
 ;; would be an unreasonable burden for a grammar checker that is useful across
 ;; virtually every language.  The default covers all commonly used modes; users
-;; who want a narrower set can trim the list before calling
-;; `lsp-ltex-plus-install-hooks' — see `lsp-ltex-plus-ensure-major-modes'.
+;; who want a narrower set can pass `:restrict-to' or `:exclude' to
+;; `lsp-ltex-plus-install-hooks' without touching this variable at all.
 (defvar lsp-ltex-plus-major-modes
   '((asciidoc-mode          . "asciidoc")
     (bibtex-mode            . "bibtex")
@@ -135,47 +137,57 @@ the identifiers used by the LSP specification.  The canonical list is at
 URL `https://code.visualstudio.com/docs/languages/identifiers'.
 Extensions can define additional identifiers beyond that list.
 
-This variable is intentionally not autoloaded.  To read or modify it
-before hooks are installed, call `lsp-ltex-plus-ensure-major-modes'
-first — that function loads this file as a side effect.")
+This variable is intentionally not autoloaded; it is defined here so that
+`lsp-ltex-plus-install-hooks' can read it at startup without loading the full
+`lsp-ltex-plus' package.")
 
 ;;;###autoload
-(defun lsp-ltex-plus-ensure-major-modes ()
-  "Make `lsp-ltex-plus-major-modes' available for customization.
-
-Calling this function loads the lsp-ltex-plus bootstrap, which defines
-`lsp-ltex-plus-major-modes' with its default list of ~80 major-mode →
-language-ID pairs.  The function body is intentionally empty: the sole
-purpose is to trigger that load via the autoload mechanism.
-
-Call this before your `use-package\\=' block whenever you want to read or
-modify `lsp-ltex-plus-major-modes\\=' — for example, to remove a mode:
-
-  (lsp-ltex-plus-ensure-major-modes)
-  (setq lsp-ltex-plus-major-modes
-        (assoc-delete-all \\='python-mode lsp-ltex-plus-major-modes))
-
-  (use-package lsp-ltex-plus
-    :defer t
-    :init (lsp-ltex-plus-install-hooks))
-
-Users who are satisfied with the default list do not need to call this
-function at all; `lsp-ltex-plus-install-hooks\\=' loads the bootstrap as a
-side effect.")
-
-;;;###autoload
-(defun lsp-ltex-plus-install-hooks ()
+(cl-defun lsp-ltex-plus-install-hooks (&key restrict-to exclude extend-to)
   "Install major-mode hooks for deferred lsp-ltex-plus activation.
 
-Reads `lsp-ltex-plus-major-modes\\=' at call time and adds
-`lsp-ltex-plus-mode\\=' to each corresponding major-mode hook.  The full
-lsp-ltex-plus package is loaded lazily — only when one of those hooks
-fires for the first time.
+With no arguments, hooks are installed for every major mode listed in
+`lsp-ltex-plus-major-modes\\='.
 
-Because the alist is read once, at call time, any customization of
-`lsp-ltex-plus-major-modes\\=' must happen BEFORE this function is called.
-With `use-package\\=', place the customization in `:custom\\=' (which runs
-before `:init\\='):
+The effective set of modes is built in three steps:
+
+1. RESTRICT-TO — whitelist.  If non-nil, must be a list of major-mode symbols.
+   Only modes present in both RESTRICT-TO and `lsp-ltex-plus-major-modes\\='
+   are considered; any symbol not found in the alist is silently skipped.
+   Omit this keyword to start from the full default list.
+
+   (lsp-ltex-plus-install-hooks
+     :restrict-to \\='(org-mode markdown-mode latex-mode LaTeX-mode))
+
+2. EXCLUDE — blacklist.  If non-nil, must be a list of major-mode symbols.
+   Those modes are removed from the list produced by step 1.  Use this to
+   drop a few unwanted modes from the large default list without having to
+   enumerate all the ones you do want:
+
+   (lsp-ltex-plus-install-hooks
+     :exclude \\='(python-mode c-mode c++-mode))
+
+3. EXTEND-TO — additions.  If non-nil, must be a list of (MAJOR-MODE .
+   LANGUAGE-ID) pairs following the same format as `lsp-ltex-plus-major-modes\\='.
+   These pairs are appended after steps 1 and 2, so they are never excluded.
+   Use this to hook modes that are absent from the built-in alist:
+
+   (lsp-ltex-plus-install-hooks
+     :extend-to \\='((my-custom-mode . \"plaintext\")))
+
+All three keywords may be combined:
+
+  (lsp-ltex-plus-install-hooks
+    :restrict-to \\='(org-mode markdown-mode)
+    :exclude     \\='(markdown-mode)       ; hypothetical, for illustration
+    :extend-to   \\='((my-custom-mode . \"plaintext\")))
+
+The full lsp-ltex-plus package is loaded lazily — only when one of the hooked
+major modes is first activated.
+
+Because `lsp-ltex-plus-major-modes\\=' is read at call time, any customization
+of that variable must happen BEFORE this function is called.  With
+`use-package\\=', place such customization in `:custom\\=' (which runs before
+`:init\\='):
 
   (use-package lsp-ltex-plus
     :defer t
@@ -183,13 +195,18 @@ before `:init\\='):
     (lsp-ltex-plus-major-modes \\='((markdown-mode . \"markdown\")
                                    (org-mode      . \"org\")))
     :init
-    (lsp-ltex-plus-install-hooks))
-
-To modify the default list rather than replace it entirely, call
-`lsp-ltex-plus-ensure-major-modes\\=' first — see its docstring."
-  (dolist (pair lsp-ltex-plus-major-modes)
-    (add-hook (intern (concat (symbol-name (car pair)) "-hook"))
-              #'lsp-ltex-plus-mode)))
+    (lsp-ltex-plus-install-hooks))"
+  (let ((pairs (if restrict-to
+                   (delq nil (mapcar (lambda (m) (assq m lsp-ltex-plus-major-modes))
+                                     restrict-to))
+                 (copy-sequence lsp-ltex-plus-major-modes))))
+    (when exclude
+      (setq pairs (cl-remove-if (lambda (pair) (memq (car pair) exclude)) pairs)))
+    (when extend-to
+      (setq pairs (append pairs extend-to)))
+    (dolist (pair pairs)
+      (add-hook (intern (concat (symbol-name (car pair)) "-hook"))
+                #'lsp-ltex-plus-mode))))
 
 (provide 'lsp-ltex-plus-bootstrap)
 ;;; lsp-ltex-plus-bootstrap.el ends here
