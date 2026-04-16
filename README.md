@@ -140,7 +140,48 @@ The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hoo
 
 `lsp-ltex-plus-major-modes` is an alist of `(major-mode . language-id)` pairs. The `car` of each entry is a standard Emacs major mode symbol. The `cdr` is a **VS Code language identifier** — the same identifier used by the LSP specification and by LTeX+ internally to decide which documents to check. The canonical list of these identifiers is at the [VS Code language identifiers page](https://code.visualstudio.com/docs/languages/identifiers); extensions can define additional ones beyond that list.
 
-To replace the default list entirely, set `lsp-ltex-plus-major-modes` in `:custom` (which runs before `:init`):
+`lsp-ltex-plus-install-hooks` accepts three optional keyword arguments that let you filter or extend the default set without touching the variable itself.
+
+**Activate only a specific subset** with `:restrict-to` (whitelist):
+
+```elisp
+(use-package lsp-ltex-plus
+  :defer t
+  :init
+  (lsp-ltex-plus-install-hooks
+    :restrict-to '(org-mode markdown-mode latex-mode LaTeX-mode)))
+```
+
+**Drop a few unwanted modes** from the large default list with `:exclude` (blacklist):
+
+```elisp
+(use-package lsp-ltex-plus
+  :defer t
+  :init
+  (lsp-ltex-plus-install-hooks
+    :exclude '(python-mode c-mode c++-mode)))
+```
+
+**Add a mode that is not in the built-in list** with `:extend-to`:
+
+```elisp
+(use-package lsp-ltex-plus
+  :defer t
+  :init
+  (lsp-ltex-plus-install-hooks
+    :extend-to '((my-custom-mode . "plaintext"))))
+```
+
+All three keywords can be combined. `:extend-to` pairs are always added after `:restrict-to` and `:exclude` are applied, so they are never accidentally dropped:
+
+```elisp
+(lsp-ltex-plus-install-hooks
+  :restrict-to '(org-mode markdown-mode)
+  :exclude     '(markdown-mode)
+  :extend-to   '((my-custom-mode . "plaintext")))
+```
+
+To **replace the default list entirely**, set `lsp-ltex-plus-major-modes` in `:custom` (which runs before `:init`):
 
 ```elisp
 (use-package lsp-ltex-plus
@@ -149,19 +190,6 @@ To replace the default list entirely, set `lsp-ltex-plus-major-modes` in `:custo
   (lsp-ltex-plus-major-modes '((markdown-mode . "markdown")
                                (org-mode      . "org")
                                (text-mode     . "plaintext")))
-  :init
-  (lsp-ltex-plus-install-hooks))
-```
-
-To add or remove individual entries from the default list, call `lsp-ltex-plus-ensure-major-modes` **before** the `use-package` block. That call loads the bootstrap file and makes `lsp-ltex-plus-major-modes` available for editing:
-
-```elisp
-(lsp-ltex-plus-ensure-major-modes)
-(setq lsp-ltex-plus-major-modes
-      (assoc-delete-all 'python-mode lsp-ltex-plus-major-modes))
-
-(use-package lsp-ltex-plus
-  :defer t
   :init
   (lsp-ltex-plus-install-hooks))
 ```
@@ -354,7 +382,7 @@ The package is split into two files with different load-time profiles:
 
 #### Setup: what happens at startup
 
-When the package manager builds `lsp-ltex-plus`, it scans both files for `;;;###autoload` cookies and writes a single autoloads file. This registers lightweight stubs for three symbols — `lsp-ltex-plus-ensure-major-modes`, `lsp-ltex-plus-install-hooks`, and `lsp-ltex-plus-mode` — very early at startup, before any `use-package` form is evaluated. Neither file is loaded yet.
+When the package manager builds `lsp-ltex-plus`, it scans both files for `;;;###autoload` cookies and writes a single autoloads file. This registers lightweight stubs for two symbols — `lsp-ltex-plus-install-hooks` and `lsp-ltex-plus-mode` — very early at startup, before any `use-package` form is evaluated. Neither file is loaded yet.
 
 When `use-package` evaluates the `:init` block and calls `(lsp-ltex-plus-install-hooks)`, it hits that stub, which loads `lsp-ltex-plus-bootstrap.el` (the tiny file only). The full package is **not** loaded. The function then adds `lsp-ltex-plus-mode` to each major-mode hook listed in `lsp-ltex-plus-major-modes`.
 
