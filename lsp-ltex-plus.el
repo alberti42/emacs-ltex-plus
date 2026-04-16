@@ -690,10 +690,14 @@ response IDs."
                    (cdr (assoc (buffer-local-value 'major-mode buf)
                                lsp-ltex-plus-major-modes)))
     :server-id 'ltex-ls-plus
-    ;; Priority -1 ensures LTeX+ acts as an auxiliary server.  It will not
-    ;; "hijack" primary LSP features (like Go to Definition or Completion) if a
-    ;; language-specific server (like texlab or pyright) is also active in the
-    ;; buffer.
+    ;; :add-on? t tells lsp-mode to start this client alongside any already-
+    ;; selected primary server (e.g. pyright, texlab) rather than competing
+    ;; with it by priority.  Without this flag, lsp-mode would pick only the
+    ;; highest-priority client and never start ltex-ls-plus when another server
+    ;; is present.  :priority -1 is kept as a safeguard so that if, for some
+    ;; reason, ltex-ls-plus ends up in a priority contest, it will never
+    ;; "hijack" primary LSP features (Go to Definition, Completion, etc.).
+    :add-on? t
     :priority -1
     :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
