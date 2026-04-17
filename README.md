@@ -415,7 +415,7 @@ When the package manager builds `lsp-ltex-plus`, it scans both files for `;;;###
 
 When `use-package` evaluates the `:init` block and calls `(lsp-ltex-plus-enable-for-modes)`, it hits that stub, which loads `lsp-ltex-plus-bootstrap.el` (the tiny file only). The full package is **not** loaded. The function stores the effective set of enabled modes in `lsp-ltex-plus--enabled-modes` and adds a single dispatcher, `lsp-ltex-plus--maybe-activate`, to `after-change-major-mode-hook`.
 
-#### Activation: user opens a relevant file
+#### Activation: user opens a file
 
 ```
 User opens foo.md
@@ -435,6 +435,17 @@ User opens foo.md
 The crucial detail is that `with-eval-after-load` fires **synchronously inside the `require` call**, at the exact moment `lsp-mode.el` evaluates `(provide 'lsp-mode)`. By the time `(lsp)` returns, the client is already registered. There is no race condition.
 
 Thus, with `with-eval-after-load`, we ensure the correct load orders, while no special configuration is required from the user.
+
+#### Why a single dispatcher?
+
+An earlier design registered `lsp-ltex-plus-mode` on each selected mode's hook individually (`text-mode-hook`, `org-mode-hook`, `markdown-mode-hook`, …). It was abandoned for two reasons:
+
+1. **Parent-mode leakage.** Emacs mode hooks inherit along the `define-derived-mode` chain. Opening an `org-mode` buffer also runs `text-mode-hook` (org derives from text via outline), so `:exclude '(org-mode)` could not actually keep the client out of org buffers as long as `text-mode` remained in the enabled set.
+2. **Redundant firings.** Every parent hook in the chain ran for each buffer open, calling the minor mode multiple times per buffer — harmless but wasteful.
+
+A grammar and spell checker is a cross-cutting tool expected to run across many writing and programming modes (the default registry ships with 80+), so the realistic baseline is a large enabled set. At that scale a single dispatcher on `after-change-major-mode-hook` that checks `(memq major-mode lsp-ltex-plus--enabled-modes)` is both the correct and the efficient choice — it fires once per mode change and matches by exact identity, so inheritance never leaks.
+
+For users who go the other way and pick only a handful of modes with `:restrict-to`, per-mode hooks would have been roughly as efficient; the remaining advantage of the dispatcher there is purely about `:exclude` correctness when an excluded descendant mode shares a parent with an enabled one. The common situation takes precedence, hence the decision for a single dispatcher. The design stays simple: one hook, one list, exact match.
 
 ## Why this package?
 
