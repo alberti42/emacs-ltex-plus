@@ -712,6 +712,38 @@ response IDs."
       (setq-local lsp-ui-sideline-enable t))
   (setq-local lsp-modeline-code-actions-enable t))
 
+(defun lsp-ltex-plus--rejoin-workspace ()
+  "Attach the current buffer to the ltex-ls-plus workspace only.
+Used when `lsp-ltex-plus-mode' activates in a buffer where `lsp-mode'
+is already running for another client (e.g. pyright, texlab).  A plain
+`(lsp)' would re-send `textDocument/didOpen' to every matching client,
+producing a \"redundant open text document\" warning from co-tenants.
+
+If an ltex-ls-plus workspace already exists for the current project,
+the buffer is opened in it.  Otherwise, a new ltex-ls-plus connection
+is started for the project."
+  (let* ((session (lsp-session))
+         (client (gethash 'ltex-ls-plus lsp-clients))
+         (project-root (when-let* ((buf-file (buffer-file-name))
+                                   (root (lsp--calculate-root session buf-file)))
+                         (lsp-f-canonical root)))
+         (workspace (and client project-root
+                         (seq-find
+                          (lambda (ws)
+                            (eq 'ltex-ls-plus (lsp--workspace-server-id ws)))
+                          (gethash project-root
+                                   (lsp-session-folder->servers session))))))
+    (cond
+     (workspace
+      (lsp--open-in-workspace workspace)
+      (cl-pushnew workspace lsp--buffer-workspaces))
+     ((and client project-root)
+      (let ((new-ws (lsp--start-connection session client project-root)))
+        (when new-ws
+          (cl-pushnew new-ws lsp--buffer-workspaces))))
+     (t
+      (lsp--warn "[lsp-ltex-plus] Could not rejoin workspace.")))))
+
 ;;;###autoload
 (define-minor-mode lsp-ltex-plus-mode
   "Minor mode for LTEX+ grammar checking via `lsp-mode'.
@@ -770,12 +802,30 @@ silently."
                 (setq lsp-ltex-plus-mode nil))
             (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
             (funcall lsp-ltex-plus-buffer-setup-function)
-            ;; If lsp-mode isn't already active, calling lsp-deferred won't do
-            ;; anything unless another server triggers lsp-mode.  We call (lsp) to
-            ;; ensure lsp-mode starts.
-            (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
-                (lsp)
-              (lsp-deferred)))))
+            (cond
+             ;; lsp-mode not yet loaded — defensive, deferred startup.
+             ((not (fboundp 'lsp))
+              (lsp-ltex-plus--log "Activation path: lsp-deferred (lsp-mode not loaded)")
+              (lsp-deferred))
+             ;; lsp-mode already active in this buffer (another client,
+             ;; e.g. pyright or texlab).  Attach only the ltex-ls-plus
+             ;; workspace to avoid a redundant didOpen to the co-tenants.
+             ((bound-and-true-p lsp-mode)
+              (lsp-ltex-plus--log "Activation path: rejoin-workspace (lsp-mode already active)")
+              (lsp-ltex-plus--rejoin-workspace))
+             ;; Another caller (e.g., a `python-mode-hook' that calls
+             ;; `lsp-deferred') already scheduled `(lsp)' to run when the
+             ;; buffer becomes visible.  Skip our own call — piggyback on
+             ;; theirs to avoid a second didOpen to the primary server.
+             ;; `ltex-ls-plus' is a registered client with `:add-on? t',
+             ;; so their `(lsp)' will pick it up automatically.
+             ((bound-and-true-p lsp--buffer-deferred)
+              (lsp-ltex-plus--log "Activation path: piggyback (lsp-deferred already scheduled)"))
+             ;; lsp-mode loaded but not yet active in this buffer —
+             ;; full startup.
+             (t
+              (lsp-ltex-plus--log "Activation path: (lsp) (first startup)")
+              (lsp))))))
     ;; Deactivation.  Two paths depending on co-tenant state:
     ;;   • Sole client — `lsp-disconnect' cleanly tears down lsp-managed-mode,
     ;;     clears diagnostics, and stops the server.
