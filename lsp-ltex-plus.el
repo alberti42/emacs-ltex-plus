@@ -90,10 +90,15 @@ gate.  Explicit interactive calls (`M-x lsp-ltex-plus-mode\\=') always
 proceed regardless of this flag, so on-demand grammar checks work in any
 supported buffer without toggling this global setting.
 
-Note: LTeX+ checks only comments whose start delimiter is preceded by
-whitespace and followed by a space — this minimises false positives from
-commented-out code.  Python comments are parsed as reStructuredText; all
-others are parsed as Markdown."
+Note: LTeX+ is selective about which comments it checks — the exact rule
+is not documented and has to be read off the server source.  What is
+verified empirically: standalone comment lines (the delimiter is the
+first non-whitespace on the line) followed by a space before the text
+are checked; trailing/inline comments after code on the same line are
+*not*.  Other cases remain to be explored in the server's comment
+regex tables.  The common effect is to minimise false positives from
+commented-out code.  Python comments are parsed as reStructuredText;
+all others are parsed as Markdown."
   :type 'boolean
   :group 'lsp-ltex-plus)
 
