@@ -74,9 +74,17 @@ detailed log files in /tmp."
   "When non-nil, enable grammar checking in programming language comments.
 
 By default this is nil, matching LTeX+\\='s own default: only markup languages
-\(LaTeX, Markdown, Org, …) are checked.  Setting this to t adds all programming
-language IDs from `lsp-ltex-plus-major-modes\\=' to the `ltex.enabled\\=' setting
-sent to the server, enabling comment checking in 30+ languages.
+\(LaTeX, Markdown, Org, …) are checked automatically.  Setting this to t lets
+the dispatcher activate `lsp-ltex-plus-mode\\=' in buffers whose `major-mode\\='
+is flagged as a programming language in `lsp-ltex-plus-major-modes\\=',
+enabling comment checking in 30+ languages.
+
+This flag only affects client-side activation.  The `ltex.enabled\\='
+list sent to the server always contains every supported language ID from
+`lsp-ltex-plus-major-modes\\='; the dispatcher is the authoritative
+gate.  Explicit interactive calls (`M-x lsp-ltex-plus-mode\\=') always
+proceed regardless of this flag, so on-demand grammar checks work in any
+supported buffer without toggling this global setting.
 
 Note: LTeX+ checks only comments whose start delimiter is preceded by
 whitespace and followed by a space — this minimises false positives from
@@ -301,15 +309,22 @@ FMT is the format string, and ARGS are the arguments for it."
      (lsp-ltex-plus--log-to-buffer (format ,fmt ,@args))))
 
 (defun lsp-ltex-plus--enabled-languages ()
-  "Return the language IDs to send in `ltex.enabled'.
-When `lsp-ltex-plus-check-programming-languages' is nil (the default),
-only IDs from markup entries (PROGRAMMING-P = nil) are returned, matching
-LTeX+\\='s own default.  When non-nil, all IDs are returned."
-  (let ((entries (if lsp-ltex-plus-check-programming-languages
-                     lsp-ltex-plus-major-modes
-                   (seq-filter (lambda (entry) (not (nth 2 entry)))
-                               lsp-ltex-plus-major-modes))))
-    (seq-uniq (mapcar #'cadr entries) #'string=)))
+  "Return the unique language IDs from `lsp-ltex-plus-major-modes'.
+All supported IDs are always returned.  Filtering happens client-side,
+via the dispatcher (`lsp-ltex-plus--maybe-activate') and the
+`lsp-ltex-plus-mode' guard: the server only ever sees documents for
+buffers in which the minor mode is active, so `ltex.enabled' can safely
+cover every registered language without triggering unwanted checks.
+
+This design differs from the VS Code LTeX+ extension, which (to the best
+of our knowledge) registers a static document selector covering every
+supported language and relies on `ltex.enabled' as a server-side runtime
+filter: the client always fires `textDocument/didChange' and the server
+drops notifications whose language ID is not enabled.  In the Emacs
+client the filter lives in the dispatcher instead, so the server only
+ever sees documents the user intended to check, and `ltex.enabled' is
+effectively a no-op by construction."
+  (seq-uniq (mapcar #'cadr lsp-ltex-plus-major-modes) #'string=))
 
 ;;;; -- Dictionary Management --------------------------------------------------
 
