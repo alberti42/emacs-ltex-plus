@@ -41,6 +41,10 @@
 (require 'cl-lib)
 (require 'lsp-ltex-plus-bootstrap)
 
+;; Optional diagnostic front-ends; checked via `bound-and-true-p' at runtime.
+(declare-function flycheck-buffer "ext:flycheck")
+(declare-function flymake-start "flymake")
+
 ;;;; -- Customization ----------------------------------------------------------
 
 (defgroup lsp-ltex-plus nil
@@ -795,7 +799,15 @@ silently."
                             `(:textDocument ,(lsp--text-document-identifier)))))
             (setq lsp--buffer-workspaces
                   (delete ltex-ws lsp--buffer-workspaces))
-            (lsp-diagnostics--workspace-cleanup ltex-ws)))))))
+            ;; Clear diagnostics in lsp-mode's model, then force the UI to
+            ;; refresh — flycheck/flymake cache overlays independently and
+            ;; won't drop ltex squiggles until asked to re-check.
+            (lsp-diagnostics--workspace-cleanup ltex-ws)
+            (run-hooks 'lsp-diagnostics-updated-hook)
+            (when (bound-and-true-p flycheck-mode)
+              (flycheck-buffer))
+            (when (bound-and-true-p flymake-mode)
+              (flymake-start))))))))
 
 
 ;; Initialize on lsp-mode load.
