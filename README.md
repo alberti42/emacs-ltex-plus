@@ -378,6 +378,22 @@ If you encounter crashes, try increasing the maximum heap size:
 
 While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes. See [Java Runtime Configuration](#3-java-runtime-configuration) for more context.
 
+### Startup Delay After Closing Buffers
+
+**Symptom:** Opening a supported buffer is noticeably slow — grammar checking only kicks in after several seconds, and this happens repeatedly, not just on the first buffer opened after starting Emacs.
+
+**Possible explanation:** `ltex-ls-plus` runs on the JVM and reloads the LanguageTool model at startup, so a cold start takes non-trivial time. This happens when `lsp-keep-workspace-alive` is set to `nil`: `lsp-mode` will shut down the server process when the last buffer attached to it is killed; the next supported buffer you open will have to wait through another cold start.
+
+**Fix:** Ensure `lsp-keep-workspace-alive` is left at its default value of `t`:
+
+```elisp
+(setq lsp-keep-workspace-alive t)
+```
+
+This keeps the workspace (and the server process) alive even when no buffers are currently attached, so later buffers reuse the warm server and diagnostics appear nearly instantaneously.
+
+Note that this setting only matters when the **last** buffer using `ltex-ls-plus` is killed. As long as at least one supported buffer remains open, the server is still in active use and will not be shut down regardless of this setting.
+
 ## Under the Hood
 
 This section is for users who want to understand how `lsp-ltex-plus` works internally — useful context if you hit an unexpected issue or simply want to know what is happening behind the scenes.
