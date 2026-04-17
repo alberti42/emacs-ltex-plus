@@ -619,18 +619,12 @@ response IDs."
                                          (shell-quote-argument lsp-ltex-plus-ls-plus-executable)
                                          (shell-quote-argument lsp-ltex-plus-server-output-log)))
                          (list lsp-ltex-plus-ls-plus-executable))))
-    ;; `:activation-fn' is evaluated on every activation check, so adding
-    ;; entries to `lsp-ltex-plus-major-modes' after client registration
-    ;; (e.g. via `lsp-ltex-plus-activate') takes effect immediately.
-    ;; When `lsp-ltex-plus-check-programming-languages' is nil, programming-
-    ;; language modes (PROGRAMMING-P = t) are excluded so that ltex-ls-plus
-    ;; does not activate as an add-on server for Python, C, etc. and does not
-    ;; interfere with the primary language server for those modes.
-    :activation-fn (lambda (_file-name mode)
-                     (let ((entry (assq mode lsp-ltex-plus-major-modes)))
-                       (and entry
-                            (or lsp-ltex-plus-check-programming-languages
-                                (not (nth 2 entry))))))
+    ;; `lsp-ltex-plus-mode' is the sole gate: if the minor mode is on,
+    ;; the user (or a permitted hook) has decided this buffer should be
+    ;; checked.  The programming-language guard lives in the mode body,
+    ;; not here, so that explicit interactive calls always succeed.
+    :activation-fn (lambda (_file-name _mode)
+                     lsp-ltex-plus-mode)
     :language-id (lambda (buf)
                    (cadr (assq (buffer-local-value 'major-mode buf)
                                lsp-ltex-plus-major-modes)))
