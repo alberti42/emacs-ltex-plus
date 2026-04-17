@@ -767,22 +767,35 @@ silently."
             (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
                 (lsp)
               (lsp-deferred)))))
-    ;; Deactivation (step 2, sole-client case only).  Reactivation is gated
-    ;; by `:activation-fn' reading the buffer-local `lsp-ltex-plus-mode', so
-    ;; no `lsp-disabled-clients' push is needed.  When ltex-ls-plus is the
-    ;; only LSP client in the buffer, `lsp-disconnect' cleanly tears down
-    ;; lsp-managed-mode, clears diagnostics, and stops the server.  When
-    ;; other clients are also active (e.g., basedpyright, texlab), we must
-    ;; NOT call `lsp-disconnect' — it would tear them down too.  That
-    ;; co-tenant case is a known-incomplete regression: ltex keeps running
-    ;; until the user kills the buffer or restarts lsp-mode.  Step 3 will
-    ;; address it with a selective workspace tear-down.
-    (when (and (bound-and-true-p lsp--buffer-workspaces)
-               (= 1 (length lsp--buffer-workspaces))
-               (eq 'ltex-ls-plus
-                   (lsp--workspace-server-id (car lsp--buffer-workspaces))))
-      (lsp-ltex-plus--log "Disabling LTEX+ in %s" (buffer-name))
-      (lsp-disconnect))))
+    ;; Deactivation.  Two paths depending on co-tenant state:
+    ;;   • Sole client — `lsp-disconnect' cleanly tears down lsp-managed-mode,
+    ;;     clears diagnostics, and stops the server.
+    ;;   • Co-tenants (e.g., basedpyright, texlab) — `lsp-disconnect' would
+    ;;     tear them down too, so we surgically remove only the ltex workspace:
+    ;;     detach this buffer from it, send `textDocument/didClose' scoped to
+    ;;     the ltex workspace, drop the workspace from `lsp--buffer-workspaces',
+    ;;     and clean up diagnostics it published.
+    (when (bound-and-true-p lsp--buffer-workspaces)
+      (let ((ltex-ws (seq-find
+                      (lambda (ws)
+                        (eq 'ltex-ls-plus (lsp--workspace-server-id ws)))
+                      lsp--buffer-workspaces)))
+        (when ltex-ws
+          (lsp-ltex-plus--log "Disabling LTEX+ in %s" (buffer-name))
+          (if (= 1 (length lsp--buffer-workspaces))
+              ;; Sole client.
+              (lsp-disconnect)
+            ;; Co-tenants remain — selective tear-down.
+            (with-lsp-workspace ltex-ws
+              (cl-callf2 delq (lsp-current-buffer)
+                         (lsp--workspace-buffers ltex-ws))
+              (with-demoted-errors
+                  "[lsp-ltex-plus] Error in didClose: %S"
+                (lsp-notify "textDocument/didClose"
+                            `(:textDocument ,(lsp--text-document-identifier)))))
+            (setq lsp--buffer-workspaces
+                  (delete ltex-ws lsp--buffer-workspaces))
+            (lsp-diagnostics--workspace-cleanup ltex-ws)))))))
 
 
 ;; Initialize on lsp-mode load.
