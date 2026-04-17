@@ -128,13 +128,13 @@ Download `lsp-ltex-plus.el`, place it in your load path, and require it:
 
 ## Basic Configuration
 
-The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hooks` in your `:init` block. It reads the default list of ~80 supported major modes and installs a lightweight hook for each one. The full package is loaded lazily — only when you first open a file whose major mode is on the list.
+The most idiomatic way to use this package is to call `lsp-ltex-plus-enable-for-modes` in your `:init` block. It reads the default list of ~80 supported major modes, records them as the effective enabled set, and installs a single dispatcher on `after-change-major-mode-hook`. The dispatcher activates the client only when `major-mode` exactly matches an enabled mode — no parent-mode leakage. The full package is loaded lazily — only when you first open a file whose major mode is on the list.
 
 ```elisp
 (use-package lsp-ltex-plus
   :defer t
   :init
-  (lsp-ltex-plus-install-hooks))
+  (lsp-ltex-plus-enable-for-modes))
 ```
 
 ### Customizing Supported Modes
@@ -147,7 +147,7 @@ The most idiomatic way to use this package is to call `lsp-ltex-plus-install-hoo
 
 The registry serves two purposes: it tells the client which buffers to accept, and it provides the language ID to send over the wire. Both are looked up dynamically at activation time, so changes take effect immediately without restarting the server.
 
-`lsp-ltex-plus-install-hooks` reads `lsp-ltex-plus-major-modes` to decide which major-mode hooks auto-start the server, but its keyword arguments (`:restrict-to`, `:exclude`, `:extend-to`) only control which hooks get installed — they never modify `lsp-ltex-plus-major-modes` itself. The full registry always stays intact.
+`lsp-ltex-plus-enable-for-modes` reads `lsp-ltex-plus-major-modes` to compute the effective set of modes the dispatcher activates on, but its keyword arguments (`:restrict-to`, `:exclude`, `:extend-to`) only control that set — they never modify `lsp-ltex-plus-major-modes` itself. The full registry always stays intact.
 
 This matters in practice: even if you auto-start the server only in Markdown, you can still call `M-x lsp-ltex-plus-mode` in an Org or Python buffer and the client activates without any prompt — because those modes are already in the registry.
 
@@ -157,7 +157,7 @@ This matters in practice: even if you auto-start the server only in Markdown, yo
 (use-package lsp-ltex-plus
   :defer t
   :init
-  (lsp-ltex-plus-install-hooks
+  (lsp-ltex-plus-enable-for-modes
     :restrict-to '(org-mode markdown-mode latex-mode LaTeX-mode)))
 ```
 
@@ -167,7 +167,7 @@ This matters in practice: even if you auto-start the server only in Markdown, yo
 (use-package lsp-ltex-plus
   :defer t
   :init
-  (lsp-ltex-plus-install-hooks
+  (lsp-ltex-plus-enable-for-modes
     :exclude '(python-mode c-mode c++-mode)))
 ```
 
@@ -177,14 +177,14 @@ This matters in practice: even if you auto-start the server only in Markdown, yo
 (use-package lsp-ltex-plus
   :defer t
   :init
-  (lsp-ltex-plus-install-hooks
+  (lsp-ltex-plus-enable-for-modes
     :extend-to '((my-custom-mode "plaintext" nil))))
 ```
 
 All three keywords can be combined. `:extend-to` entries are always added after `:restrict-to` and `:exclude` are applied, so they are never accidentally dropped:
 
 ```elisp
-(lsp-ltex-plus-install-hooks
+(lsp-ltex-plus-enable-for-modes
   :restrict-to '(org-mode markdown-mode)
   :exclude     '(markdown-mode)
   :extend-to   '((my-custom-mode "plaintext" nil)))
@@ -201,7 +201,7 @@ If none of the keyword arguments are sufficient and you need to replace the list
 (use-package lsp-ltex-plus
   :defer t
   :init
-  (lsp-ltex-plus-install-hooks))
+  (lsp-ltex-plus-enable-for-modes))
 ```
 
 ### Ready-to-go Configuration Example
@@ -229,9 +229,9 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
   (lsp-ltex-plus-check-programming-languages t)
 
   :init
-  ;; Install hooks for all supported major modes. The full package loads
-  ;; lazily — only when you first open a relevant file.
-  (lsp-ltex-plus-install-hooks)
+  ;; Enable lsp-ltex-plus for all supported major modes. The full package
+  ;; loads lazily — only when you first open a relevant file.
+  (lsp-ltex-plus-enable-for-modes)
 
   :config
   ;; Optional: Automatically use credentials from environment variables.
@@ -263,7 +263,7 @@ Once active, LTeX+ works just like any other LSP server:
 
 ### Manual activation in any buffer
 
-If you used `:restrict-to` or `:exclude` when calling `lsp-ltex-plus-install-hooks`, some buffers will not have a hook installed. You can still enable grammar checking in any buffer on demand with:
+If you used `:restrict-to` or `:exclude` when calling `lsp-ltex-plus-enable-for-modes`, some buffers will not trigger automatic activation. You can still enable grammar checking in any buffer on demand with:
 
 ```
 M-x lsp-ltex-plus-mode
@@ -411,23 +411,25 @@ The package is split into two files with different load-time profiles:
 
 #### Setup: what happens at startup
 
-When the package manager builds `lsp-ltex-plus`, it scans both files for `;;;###autoload` cookies and writes a single autoloads file. This registers lightweight stubs for two symbols — `lsp-ltex-plus-install-hooks` and `lsp-ltex-plus-mode` — very early at startup, before any `use-package` form is evaluated. Neither file is loaded yet.
+When the package manager builds `lsp-ltex-plus`, it scans both files for `;;;###autoload` cookies and writes a single autoloads file. This registers lightweight stubs for two symbols — `lsp-ltex-plus-enable-for-modes` and `lsp-ltex-plus-mode` — very early at startup, before any `use-package` form is evaluated. Neither file is loaded yet.
 
-When `use-package` evaluates the `:init` block and calls `(lsp-ltex-plus-install-hooks)`, it hits that stub, which loads `lsp-ltex-plus-bootstrap.el` (the tiny file only). The full package is **not** loaded. The function then adds `lsp-ltex-plus-mode` to each major-mode hook listed in `lsp-ltex-plus-major-modes`.
+When `use-package` evaluates the `:init` block and calls `(lsp-ltex-plus-enable-for-modes)`, it hits that stub, which loads `lsp-ltex-plus-bootstrap.el` (the tiny file only). The full package is **not** loaded. The function stores the effective set of enabled modes in `lsp-ltex-plus--enabled-modes` and adds a single dispatcher, `lsp-ltex-plus--maybe-activate`, to `after-change-major-mode-hook`.
 
 #### Activation: user opens a relevant file
 
 ```
 User opens foo.md
-  → markdown-mode activates → markdown-mode-hook fires
-      → lsp-ltex-plus-mode called ← hits its autoload stub
-          → lsp-ltex-plus.el loads for the first time
-              → (require 'lsp-ltex-plus-bootstrap) → already loaded, no-op
-              → (with-eval-after-load 'lsp-mode ...) registered
-          → lsp-ltex-plus-mode body runs → (lsp) called
-              → lsp-mode.el loads → (provide 'lsp-mode) fires
-                  → lsp-ltex-plus--setup runs ← client registered
-              → lsp-mode finds ltex-ls-plus, activates it
+  → markdown-mode activates → after-change-major-mode-hook fires
+      → lsp-ltex-plus--maybe-activate runs
+          → (memq 'markdown-mode lsp-ltex-plus--enabled-modes) → non-nil
+          → lsp-ltex-plus-mode called ← hits its autoload stub
+              → lsp-ltex-plus.el loads for the first time
+                  → (require 'lsp-ltex-plus-bootstrap) → already loaded, no-op
+                  → (with-eval-after-load 'lsp-mode ...) registered
+              → lsp-ltex-plus-mode body runs → (lsp) called
+                  → lsp-mode.el loads → (provide 'lsp-mode) fires
+                      → lsp-ltex-plus--setup runs ← client registered
+                  → lsp-mode finds ltex-ls-plus, activates it
 ```
 
 The crucial detail is that `with-eval-after-load` fires **synchronously inside the `require` call**, at the exact moment `lsp-mode.el` evaluates `(provide 'lsp-mode)`. By the time `(lsp)` returns, the client is already registered. There is no race condition.

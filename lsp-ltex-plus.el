@@ -763,6 +763,7 @@ silently."
     ;; When disabling, add the server to disabled clients to prevent auto-restart.
     (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
 
+
 ;; Initialize on lsp-mode load.
 (with-eval-after-load 'lsp-mode
   (lsp-ltex-plus--setup))

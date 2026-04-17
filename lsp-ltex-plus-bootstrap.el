@@ -19,7 +19,7 @@
 ;; first opens a file whose major mode is in the list.
 ;;
 ;; Users normally do not load this file directly; it is pulled in
-;; automatically when `lsp-ltex-plus-install-hooks' is called from the
+;; automatically when `lsp-ltex-plus-enable-for-modes' is called from the
 ;; `:init' block of `use-package'.
 
 ;;; Code:
@@ -33,10 +33,12 @@
 
 ;; This variable is defined here, in the bootstrap file, rather than in the main
 ;; `lsp-ltex-plus.el', so that it is available at Emacs startup without loading
-;; the full package.  `lsp-ltex-plus-install-hooks' reads this list at `:init'
-;; time to register per-mode hooks; those hooks are what trigger the lazy load
-;; of `lsp-ltex-plus.el' — only when the user first opens a relevant file.
-;; If the list lived in `lsp-ltex-plus.el', calling `lsp-ltex-plus-install-hooks'
+;; the full package.  `lsp-ltex-plus-enable-for-modes' reads this list at `:init'
+;; time to compute the effective set of enabled modes and install a single
+;; dispatcher on `after-change-major-mode-hook'; that dispatcher is what
+;; triggers the lazy load of `lsp-ltex-plus.el' — only when the user first
+;; opens a buffer whose exact `major-mode' is in the enabled set.
+;; If the list lived in `lsp-ltex-plus.el', calling `lsp-ltex-plus-enable-for-modes'
 ;; would force the entire package to load immediately, defeating deferred loading.
 ;;
 ;; By design, the list ships pre-populated with 80+ entries.  Many similar
@@ -44,7 +46,7 @@
 ;; would be an unreasonable burden for a grammar checker that is useful across
 ;; virtually every language.  The default covers all commonly used modes; users
 ;; who want a narrower set can pass `:restrict-to' or `:exclude' to
-;; `lsp-ltex-plus-install-hooks' without touching this variable at all.
+;; `lsp-ltex-plus-enable-for-modes' without touching this variable at all.
 (defvar lsp-ltex-plus-major-modes
   ;; Each entry is (MAJOR-MODE LANGUAGE-ID PROGRAMMING-P).
   ;; PROGRAMMING-P is nil for markup/writing languages (checked by default)
@@ -154,15 +156,40 @@ category:
                   is non-nil.
 
 This variable is intentionally not autoloaded; it is defined here so that
-`lsp-ltex-plus-install-hooks' can read it at startup without loading the full
-`lsp-ltex-plus' package.")
+`lsp-ltex-plus-enable-for-modes' can read it at startup without loading the
+full `lsp-ltex-plus' package.")
+
+(defvar lsp-ltex-plus--enabled-modes nil
+  "Effective set of major-mode symbols for which lsp-ltex-plus is enabled.
+Populated by `lsp-ltex-plus-enable-for-modes' from the result of applying
+`:restrict-to', `:exclude', and `:extend-to' to `lsp-ltex-plus-major-modes'.
+Consulted at runtime by `lsp-ltex-plus--maybe-activate' (attached to
+`after-change-major-mode-hook') to decide whether to turn on
+`lsp-ltex-plus-mode' in the current buffer.  Matching is strict — only an
+exact `eq' match against `major-mode' activates the client, so parent-mode
+relationships (e.g. `org-mode' deriving from `text-mode') never leak
+activation into buffers the user did not select.")
+
+(defun lsp-ltex-plus--maybe-activate ()
+  "Enable `lsp-ltex-plus-mode' when `major-mode' is in the enabled set.
+Attached once to `after-change-major-mode-hook' by
+`lsp-ltex-plus-enable-for-modes'.  The full `lsp-ltex-plus' package is loaded
+lazily on the first call that reaches `lsp-ltex-plus-mode'."
+  (when (memq major-mode lsp-ltex-plus--enabled-modes)
+    (lsp-ltex-plus-mode 1)))
 
 ;;;###autoload
-(cl-defun lsp-ltex-plus-install-hooks (&key restrict-to exclude extend-to)
-  "Install major-mode hooks for deferred lsp-ltex-plus activation.
+(cl-defun lsp-ltex-plus-enable-for-modes (&key restrict-to exclude extend-to)
+  "Enable `lsp-ltex-plus-mode' in the selected major modes.
 
-With no arguments, hooks are installed for every major mode listed in
-`lsp-ltex-plus-major-modes\\='.
+Installs a single dispatcher on `after-change-major-mode-hook' that activates
+the client in any buffer whose `major-mode' exactly matches one of the
+selected modes.  Exact matching means parent-mode relationships do not cause
+spurious activations: excluding `org-mode' keeps the client out of org
+buffers even though `org-mode' derives from `text-mode'.
+
+With no arguments, every major mode listed in `lsp-ltex-plus-major-modes\\='
+is enabled.
 
 The effective set of modes is built in three steps:
 
@@ -171,7 +198,7 @@ The effective set of modes is built in three steps:
    are considered; any symbol not found in the alist is silently skipped.
    Omit this keyword to start from the full default list.
 
-   (lsp-ltex-plus-install-hooks
+   (lsp-ltex-plus-enable-for-modes
      :restrict-to \\='(org-mode markdown-mode latex-mode LaTeX-mode))
 
 2. EXCLUDE — blacklist.  If non-nil, must be a list of major-mode symbols.
@@ -179,27 +206,27 @@ The effective set of modes is built in three steps:
    drop a few unwanted modes from the large default list without having to
    enumerate all the ones you do want:
 
-   (lsp-ltex-plus-install-hooks
+   (lsp-ltex-plus-enable-for-modes
      :exclude \\='(python-mode c-mode c++-mode))
 
 3. EXTEND-TO — additions.  If non-nil, must be a list of
    (MAJOR-MODE LANGUAGE-ID PROGRAMMING-P) entries following the same format
    as `lsp-ltex-plus-major-modes\\='.  These entries are appended after steps
-   1 and 2, so they are never excluded.  Use this to hook modes that are
+   1 and 2, so they are never excluded.  Use this to enable modes that are
    absent from the built-in list:
 
-   (lsp-ltex-plus-install-hooks
+   (lsp-ltex-plus-enable-for-modes
      :extend-to \\='((my-custom-mode \"plaintext\" nil)))
 
 All three keywords may be combined:
 
-  (lsp-ltex-plus-install-hooks
+  (lsp-ltex-plus-enable-for-modes
     :restrict-to \\='(org-mode markdown-mode)
     :exclude     \\='(markdown-mode)       ; hypothetical, for illustration
     :extend-to   \\='((my-custom-mode \"plaintext\" nil)))
 
-The full lsp-ltex-plus package is loaded lazily — only when one of the hooked
-major modes is first activated.
+The full lsp-ltex-plus package is loaded lazily — only when a selected major
+mode is first activated in some buffer.
 
 Because `lsp-ltex-plus-major-modes\\=' is read at call time, any direct
 modification of that variable must happen BEFORE this function is called.
@@ -213,10 +240,13 @@ the `use-package\\=' block:
   (use-package lsp-ltex-plus
     :defer t
     :init
-    (lsp-ltex-plus-install-hooks))
+    (lsp-ltex-plus-enable-for-modes))
 
 In most cases the keyword arguments above are sufficient and direct
-modification of `lsp-ltex-plus-major-modes\\=' is not needed."
+modification of `lsp-ltex-plus-major-modes\\=' is not needed.
+
+Calling this function again replaces the enabled set; the dispatcher itself
+is installed only once."
   (let ((pairs (if restrict-to
                    (delq nil (mapcar (lambda (m) (assq m lsp-ltex-plus-major-modes))
                                      restrict-to))
@@ -225,9 +255,12 @@ modification of `lsp-ltex-plus-major-modes\\=' is not needed."
       (setq pairs (cl-remove-if (lambda (pair) (memq (car pair) exclude)) pairs)))
     (when extend-to
       (setq pairs (append pairs extend-to)))
-    (dolist (pair pairs)
-      (add-hook (intern (concat (symbol-name (car pair)) "-hook"))
-                #'lsp-ltex-plus-mode))))
+    (setq lsp-ltex-plus--enabled-modes (mapcar #'car pairs))
+    (add-hook 'after-change-major-mode-hook #'lsp-ltex-plus--maybe-activate)))
+
+;;;###autoload
+(define-obsolete-function-alias 'lsp-ltex-plus-install-hooks
+  'lsp-ltex-plus-enable-for-modes "0.2.0")
 
 
 (provide 'lsp-ltex-plus-bootstrap)
