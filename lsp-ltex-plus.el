@@ -752,8 +752,22 @@ silently."
             (if (and (fboundp 'lsp) (not (bound-and-true-p lsp-mode)))
                 (lsp)
               (lsp-deferred)))))
-    ;; When disabling, add the server to disabled clients to prevent auto-restart.
-    (setq-local lsp-disabled-clients (add-to-list 'lsp-disabled-clients 'ltex-ls-plus))))
+    ;; Deactivation (step 2, sole-client case only).  Reactivation is gated
+    ;; by `:activation-fn' reading the buffer-local `lsp-ltex-plus-mode', so
+    ;; no `lsp-disabled-clients' push is needed.  When ltex-ls-plus is the
+    ;; only LSP client in the buffer, `lsp-disconnect' cleanly tears down
+    ;; lsp-managed-mode, clears diagnostics, and stops the server.  When
+    ;; other clients are also active (e.g., basedpyright, texlab), we must
+    ;; NOT call `lsp-disconnect' — it would tear them down too.  That
+    ;; co-tenant case is a known-incomplete regression: ltex keeps running
+    ;; until the user kills the buffer or restarts lsp-mode.  Step 3 will
+    ;; address it with a selective workspace tear-down.
+    (when (and (bound-and-true-p lsp--buffer-workspaces)
+               (= 1 (length lsp--buffer-workspaces))
+               (eq 'ltex-ls-plus
+                   (lsp--workspace-server-id (car lsp--buffer-workspaces))))
+      (lsp-ltex-plus--log "Disabling LTEX+ in %s" (buffer-name))
+      (lsp-disconnect))))
 
 
 ;; Initialize on lsp-mode load.
