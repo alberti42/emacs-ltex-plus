@@ -706,15 +706,13 @@ silently."
   (if lsp-ltex-plus-mode
       (let* ((entry (assq major-mode lsp-ltex-plus-major-modes))
              (programming-p (and entry (nth 2 entry))))
-        (if (and programming-p (not lsp-ltex-plus-check-programming-languages))
-            ;; Programming-language mode with checking disabled: do not activate.
-            ;; When called interactively, inform the user how to opt in.
-            (progn
-              (when (called-interactively-p 'any)
-                (message (concat "[lsp-ltex-plus] Grammar checking in programming languages "
-                                 "is disabled.  Set `lsp-ltex-plus-check-programming-languages'"
-                                 " to t to enable it.")))
-              (setq lsp-ltex-plus-mode nil))
+        (if (and programming-p
+                 (not lsp-ltex-plus-check-programming-languages)
+                 (not (called-interactively-p 'any)))
+            ;; Hook-driven activation for a programming-language mode with
+            ;; checking disabled: silently bail out.  Explicit interactive
+            ;; calls always proceed so the user can run an on-demand check.
+            (setq lsp-ltex-plus-mode nil)
           ;; Register the current major mode if it is not yet known to the client.
           ;; Two tables must be updated:
           ;;   1. `lsp-ltex-plus-major-modes' — our own registry, read by the
