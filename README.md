@@ -2,7 +2,7 @@
 
 `lsp-ltex-plus` is a lightweight [lsp-mode](https://github.com/emacs-lsp/lsp-mode) client for **LTeX+**, a powerful grammar and spell checker powered by [LanguageTool](https://languagetool.org/).
 
-This package allows you to have professional-grade grammar checking in Emacs while you write Markdown, LaTeX, Org-mode, and more — and also checks grammar and spelling inside comments and string literals of 30+ programming languages. It is designed to be an "add-on" server, meaning it runs quietly in the background alongside your existing language servers without interfering with them.
+This package allows you to have professional-grade grammar checking in Emacs while you write Markdown, LaTeX, Org-mode, Magit-commit messages, and more — and also checks grammar and spelling inside comments and string literals of 30+ programming languages. It is designed to be an "add-on" server, meaning it runs quietly in the background alongside your existing language servers without interfering with them. With the local backend, checks typically complete fast enough to feel instant while you type — see [Performance](#performance) for measured numbers and a reproducible benchmark.
 
 ![LTeX+ in action](screenshot.jpg)
 *LTeX+ in action: `C-c l a a` activates the LSP actions, allowing you to choose the suitable correction (e.g., fixing "your" to "you're" in the example above). The key binding can be customized by configuring the `lsp-mode` package.*
