@@ -413,6 +413,17 @@ pgrep -afl 'ltex-ls-plus|ltex.ls.plus'
 This shuts down each server when the last buffer attached to it is killed, at the cost of the cold-start delay the previous subsection discusses each time you return to such a buffer. Pick whichever trade-off fits your workflow.
 
 **Proper fix (upstream):** the underlying server would need to implement workspace folders support (`workspace/didChangeWorkspaceFolders` and related handshake). Since `ltex-ls-plus` holds no per-project state that materially differs between roots, one server could handle all folders in a single JVM. This requires a change in `ltex-ls-plus` itself; it is not fixable on the Emacs side.
+
+### No Grammar Checking in Scratch or Anonymous Buffers
+
+**Symptom:** You write prose in `*scratch*` (or any buffer not visiting a file), enable `lsp-ltex-plus-mode` manually, and nothing happens — no lighter, no diagnostics.
+
+**Explanation:** `lsp-mode` identifies every document by a `file://` URI derived from the buffer's file name. A buffer without a file name cannot form such a URI, so the `textDocument/didOpen` handshake that would carry the buffer contents to the server never happens. The grammar-check engine itself has no problem with orphan buffers — it operates purely on the text content passed over the wire — but the LSP plumbing around it does.
+
+**Workaround:** save the buffer to a file first. Even a throwaway path under `/tmp` is enough to satisfy the URI requirement, after which `lsp-ltex-plus-mode` activates normally.
+
+Supporting orphan buffers without requiring a save is tracked as a future enhancement (synthetic `untitled:` URIs or transparent temp-file mirroring).
+
 ## Under the Hood
 
 This section is for users who want to understand how `lsp-ltex-plus` works internally — useful context if you hit an unexpected issue or simply want to know what is happening behind the scenes.
