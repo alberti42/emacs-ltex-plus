@@ -1,6 +1,10 @@
 # Comparative Analysis: `lsp-ltex-plus` vs. `lsp-ltex`
 
-This document compares `lsp-ltex-plus` (this package) with the original [`lsp-ltex`](https://github.com/emacs-languagetool/lsp-ltex) package. While both act as LSP clients for LTeX, `lsp-ltex-plus` is a modernized, protocol-corrected implementation.
+This document compares `lsp-ltex-plus` (this package) with the original [`emacs-languagetool/lsp-ltex`](https://github.com/emacs-languagetool/lsp-ltex) package. While both act as LSP clients for LTeX, `lsp-ltex-plus` is a modernized, protocol-corrected implementation.
+
+## A note on naming
+
+Separately from the original `lsp-ltex`, a second project also carries the `-plus` suffix: [`emacs-languagetool/lsp-ltex-plus`](https://github.com/emacs-languagetool/lsp-ltex-plus). From a reading of its source, that project appears to be the original `lsp-ltex` codebase with its function and variable prefixes renamed from `lsp-ltex-` to `lsp-ltex-plus-`, retargeted at the newer `ltex-ls-plus` server binary. It may therefore benefit from new features exposed by `ltex-ls-plus` that `lsp-ltex` itself cannot reach. The comparison below is written against the original `lsp-ltex`, but most of the technical differences apply to the renamed project as well, since the renamed project inherits `lsp-ltex`'s architecture.
 
 ---
 
@@ -65,3 +69,13 @@ The two projects have diverging philosophies regarding server binaries.
 
 *   **`lsp-ltex-plus`:** Uses a `tee`-based pipeline to log raw JSON-RPC traffic to `/tmp/ltex-server-input.log` and `/tmp/ltex-server-output.log` when debugging is enabled.
 *   **`lsp-ltex`:** Relies solely on `lsp-mode`'s standard logging, which may not capture raw timing or corruption issues at the process level.
+
+---
+
+## 5. Workspace Reuse and Memory Footprint
+The server runs on the JVM and typically reserves several hundred megabytes of heap per process, so how the client asks `lsp-mode` to manage server instances has a direct effect on RAM usage when the user works across multiple unrelated directories.
+
+*   **`lsp-ltex-plus`:** Registers the client with `:multi-root t`. `lsp-mode` then reuses a single server workspace across all project roots for this client, so **one JVM** handles every supported buffer in the session — whether those buffers belong to the same git repository or to ten unrelated directories.
+*   **`lsp-ltex`:** Registers without `:multi-root`. `lsp-mode` defaults to one workspace per detected project root, so opening files from multiple unrelated directories spawns one JVM per root.
+
+The difference is a single keyword at the registration call site. Mentioned here for the users of the other project, because it can be fixed with a single line.
