@@ -123,6 +123,27 @@ custom handler are not affected by the advice and should filter on
   :type 'boolean
   :group 'lsp-ltex-plus)
 
+(defcustom lsp-ltex-plus-show-latency nil
+  "When non-nil, echo the server round-trip time after every check.
+
+The measurement runs from the moment `textDocument/didChange\\=' is
+dispatched to ltex-ls-plus until the matching
+`textDocument/publishDiagnostics\\=' arrives, and is reported with a
+message of the form \"Completed spell checking in N ms.\".
+
+This reports server-side latency only.  It does *not* include the
+subsequent `lsp-mode' / flycheck / flymake rendering step that draws
+the squiggles on screen, which typically adds several hundred
+milliseconds on top and dominates perceived responsiveness in Emacs.
+
+Off by default: with a short debounce interval the message fires on
+essentially every keystroke and the constant echo-area updates are
+distracting during normal editing.  Enable it when investigating
+latency (e.g. comparing local vs. remote LanguageTool backends) and
+disable it again afterwards."
+  :type 'boolean
+  :group 'lsp-ltex-plus)
+
 (defcustom lsp-ltex-plus-multi-root t
   "When non-nil, register the ltex-ls-plus client as multi-root.
 
@@ -629,11 +650,18 @@ ORIG-FN for every other WORKSPACE."
 
 ;;;; -- Latency Benchmarking ---------------------------------------------------
 
-;; When `lsp-ltex-plus-debug' is non-nil, measure the round-trip between
-;; `textDocument/didChange' (outgoing) and `textDocument/publishDiagnostics'
-;; (incoming) for the ltex-ls-plus workspace, and report the elapsed time in
-;; milliseconds to the `*lsp-ltex-plus::client*' log.  Useful for comparing
-;; local vs. remote LanguageTool backends.
+;; Measure the round-trip between `textDocument/didChange' (outgoing) and
+;; `textDocument/publishDiagnostics' (incoming) for the ltex-ls-plus
+;; workspace.  Two independent reporters consume the measurement:
+;;
+;; - `lsp-ltex-plus-debug'         → timestamped entry in the
+;;                                   `*lsp-ltex-plus::client*' log buffer.
+;; - `lsp-ltex-plus-show-latency'  → one-line echo-area message
+;;                                   (\"Completed spell checking in N ms.\").
+;;
+;; Either, both, or neither can be enabled at any time.  The benchmark only
+;; reflects server-side latency; the subsequent flycheck/flymake rendering
+;; step is not included (see `lsp-ltex-plus-show-latency' docstring).
 ;;
 ;; Notes:
 ;; - Consecutive edits debounce in `lsp-mode'; we measure from the moment the
@@ -648,11 +676,15 @@ ORIG-FN for every other WORKSPACE."
 Each value is a cons (TIMESTAMP . BUFFER).  Consumed when the matching
 `textDocument/publishDiagnostics' arrives.")
 
+(defsubst lsp-ltex-plus--benchmark-enabled-p ()
+  "Return non-nil when any latency reporter is active."
+  (or lsp-ltex-plus-debug lsp-ltex-plus-show-latency))
+
 (defun lsp-ltex-plus--benchmark-didchange (orig-fn method params)
   "Record the dispatch time of `textDocument/didChange' to ltex-ls-plus.
 Around-advice for `lsp-notify'.  ORIG-FN, METHOD and PARAMS are forwarded
 unchanged; the advice only observes the call."
-  (when (and lsp-ltex-plus-debug
+  (when (and (lsp-ltex-plus--benchmark-enabled-p)
              (equal method "textDocument/didChange")
              (bound-and-true-p lsp--cur-workspace)
              (eq 'ltex-ls-plus
@@ -663,17 +695,23 @@ unchanged; the advice only observes the call."
   (funcall orig-fn method params))
 
 (defun lsp-ltex-plus--benchmark-diagnostics (workspace &rest _args)
-  "Log didChange→publishDiagnostics latency for ltex-ls-plus.
+  "Report didChange→publishDiagnostics latency for ltex-ls-plus.
 After-advice for `lsp--on-diagnostics'; WORKSPACE is the workspace that
-just published diagnostics."
-  (when (and lsp-ltex-plus-debug
+just published diagnostics.  Output sinks are controlled by
+`lsp-ltex-plus-debug' (log buffer) and `lsp-ltex-plus-show-latency'
+\(echo area)."
+  (when (and (lsp-ltex-plus--benchmark-enabled-p)
              (eq 'ltex-ls-plus (lsp--workspace-server-id workspace)))
-    (when-let* ((entry (gethash workspace lsp-ltex-plus--did-change-timestamps))
-                (ts    (car entry))
-                (buf   (cdr entry)))
-      (lsp-ltex-plus--log "didChange → publishDiagnostics: %d ms (buffer: %s)"
-                          (lsp--ms-since ts)
-                          (buffer-name buf))
+    (when-let* ((entry   (gethash workspace lsp-ltex-plus--did-change-timestamps))
+                (ts      (car entry))
+                (buf     (cdr entry))
+                (elapsed (lsp--ms-since ts)))
+      (when lsp-ltex-plus-debug
+        (lsp-ltex-plus--log "didChange → publishDiagnostics: %d ms (buffer: %s)"
+                            elapsed (buffer-name buf)))
+      (when lsp-ltex-plus-show-latency
+        (let ((message-log-max nil))
+          (message "Completed spell checking in %d ms." elapsed)))
       (remhash workspace lsp-ltex-plus--did-change-timestamps))))
 
 ;;;; -- Lsp-mode Registration --------------------------------------------------
