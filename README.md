@@ -233,15 +233,23 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
   :defer t
 
   :custom
-  ;; To use the online service, set the URI.
-  ;; If you prefer the local-only server, you can omit this (it defaults to nil).
-  (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")
+  ;; Uncomment to use the online LanguageTool service.
+  ;; If left commented, the local-only server is used (default).
+  ;; (lsp-ltex-plus-lt-server-uri "https://api.languagetoolplus.com")
 
   ;; Opt in to grammar checking inside programming language comments.
   ;; By default only markup languages (LaTeX, Markdown, Org, …) are checked.
   ;; Set to t to also check comments in Python, C, Rust, and all other
   ;; programming languages in lsp-ltex-plus-major-modes.
   (lsp-ltex-plus-check-programming-languages t)
+
+  ;; Apply the "Kind-First" protocol patch to lsp-mode. Strongly recommended
+  ;; if you uncomment the remote server URI above — network latency makes
+  ;; JSON-RPC ID collisions almost inevitable, which can stall the connection.
+  ;; Safe to leave enabled for local use too; benefits every LSP client, not
+  ;; only ltex-ls-plus.  See the "Lsp-mode Protocol Patch" section below for
+  ;; details.
+  (lsp-ltex-plus-apply-kind-first-patch t)
 
   :init
   ;; Enable lsp-ltex-plus for all supported major modes. The full package
