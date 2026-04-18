@@ -394,6 +394,25 @@ This keeps the workspace (and the server process) alive even when no buffers are
 
 Note that this setting only matters when the **last** buffer using `ltex-ls-plus` is killed. As long as at least one supported buffer remains open, the server is still in active use and will not be shut down regardless of this setting.
 
+### High Memory Use with Many Loose Files
+
+**Symptom:** After opening several supported files from unrelated directories, you notice multiple `java` / `ltex-ls-plus` processes running, each claiming several hundred megabytes of RAM. Memory use scales roughly linearly with the number of distinct directories you have touched in the session. You can check from a terminal:
+
+```bash
+pgrep -afl 'ltex-ls-plus|ltex.ls.plus'
+```
+
+**Explanation:** `lsp-mode` keys its workspaces on `(client, project-root)`. Each distinct project root — for files inside a git repo, the repo root; for loose files outside any project, typically the file's own directory — creates its own workspace. Because `ltex-ls-plus` does not yet advertise support for `workspace.workspaceFolders` in its LSP capabilities, `lsp-mode` cannot reuse a single server across multiple roots and must spawn a fresh JVM for each. Ten `.md` files in ten unrelated directories → ten JVMs.
+
+**Mitigation:** if memory pressure matters more to you than startup latency, set `lsp-keep-workspace-alive` to `nil`:
+
+```elisp
+(setq lsp-keep-workspace-alive nil)
+```
+
+This shuts down each server when the last buffer attached to it is killed, at the cost of the cold-start delay the previous subsection discusses each time you return to such a buffer. Pick whichever trade-off fits your workflow.
+
+**Proper fix (upstream):** the underlying server would need to implement workspace folders support (`workspace/didChangeWorkspaceFolders` and related handshake). Since `ltex-ls-plus` holds no per-project state that materially differs between roots, one server could handle all folders in a single JVM. This requires a change in `ltex-ls-plus` itself; it is not fixable on the Emacs side.
 ## Under the Hood
 
 This section is for users who want to understand how `lsp-ltex-plus` works internally — useful context if you hit an unexpected issue or simply want to know what is happening behind the scenes.
