@@ -682,7 +682,7 @@ ORIG-FN for every other WORKSPACE."
 ;; from the user's keystroke — so the number reflects "server became aware of
 ;; the new state → diagnostics returned", which is what we want to report.
 ;;
-;; ---- Correlation model and accuracy ----------------------------------------
+;; CURRENT LIMITATIONS OF BENCHMARKS
 ;;
 ;; A `publishDiagnostics' notification does not carry a reference to the
 ;; trigger it answers: no JSON-RPC `id' (it is a notification, not a
@@ -696,7 +696,7 @@ ORIG-FN for every other WORKSPACE."
 ;; simplest workable scheme with no correlation ID available, and it is correct
 ;; in the common case (one trigger → one response, with nothing else in flight).
 ;;
-;; PATHOLOGICAL SITUATIONS: OPTIMISTIC TIMING
+;; CAVEAT: OPTIMISTIC TIMING IN PATHOLOGICAL SITUATIONS
 ;;
 ;;  When more than one trigger fires before the first response returns, we
 ;;  measure from the *most recent* trigger, even though the server may still be

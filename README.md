@@ -324,6 +324,7 @@ You can configure these using `:custom` in `use-package`:
 | `lsp-ltex-plus-check-frequency` | Controls when documents should be checked (edit, save, manual). | X |
 | `lsp-ltex-plus-clear-diagnostics-when-closing-file` | Whether to clear diagnostics when a file is closed. | X |
 | `lsp-ltex-plus-show-progress` | When non-nil (default), show `ltex-ls-plus` progress updates in the mode line (the `⌛` prefix and optional spinner). Set to nil to silence the flicker on every keystroke without affecting progress rendering for other LSP clients. | || `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
+| `lsp-ltex-plus-show-latency` | When non-nil, echo the server round-trip time (from `textDocument/didChange` to the matching `textDocument/publishDiagnostics`) after every check, as `"Completed spell checking in N ms."`. Off by default; see [Measuring Server Latency](#measuring-server-latency). | |
 | `lsp-ltex-plus-multi-root` | When non-nil (default), register the client as multi-root so a single `ltex-ls-plus` JVM handles all folders in the session. Leave enabled unless you have a specific need to isolate projects — disabling it spawns one JVM per project root, which can balloon memory usage. | |
 
 </details>
@@ -426,6 +427,35 @@ Supporting orphan buffers without requiring a save is tracked as a future enhanc
 ## Under the Hood
 
 This section is for users who want to understand how `lsp-ltex-plus` works internally — useful context if you hit an unexpected issue or simply want to know what is happening behind the scenes.
+
+### Measuring Server Latency
+
+If you want to evaluate how fast `ltex-ls-plus` responds on your machine — for example, to compare the local backend against a remote LanguageTool service — enable `lsp-ltex-plus-show-latency`:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-show-latency t))
+```
+
+Two distinct events are reported with different wording so the two regimes can be distinguished at a glance:
+
+| Event | Triggered by | Message |
+| :--- | :--- | :--- |
+| **Cold start** | `textDocument/didOpen` (first time the buffer is shown to the server) | `Completed initial spell check in N ms.` |
+| **Warm path** | `textDocument/didChange` (every edit, debounced) | `Completed spell check in N ms.` |
+
+The cold-start figure reflects a full first-pass check of the entire document. The warm-path figure reflects incremental re-checks served partly from the server's sentence cache. Reporting both lets you quote numbers such as *"first open: X ms, incremental edit: Y ms."*
+
+On a modern laptop with the local backend, incremental edits typically land in around **~60 ms** for short Org / Markdown buffers and **~120 ms** for long LaTeX documents. The cold-start figure is always noticeably higher — the server has to parse the full document from scratch and prime its caches before the first diagnostics come back.
+
+A remote LanguageTool server typically adds 100–300 ms on top of both numbers, depending on network latency and how busy the service is.
+
+> **Important — what the numbers do _not_ include.** Each measurement stops the instant diagnostics *arrive*. It does **not** cover the subsequent rendering step inside Emacs: `lsp-mode`'s diagnostic dispatch, `flycheck` / `flymake` overlay refresh, and any `lsp-ui-sideline` redraw. On typical configurations that rendering path adds several hundred milliseconds on top and is the **dominant contributor to perceived responsiveness** — not the grammar checker itself.
+>
+> So if the experience feels laggy even though `ltex-ls-plus` reports a small number, the bottleneck is in the UI layer above LSP, not in the grammar checker below it. Tuning `lsp-idle-delay`, `flycheck-idle-change-delay`, and `lsp-ui-sideline-delay` usually helps more than replacing the checker with a faster one.
+
+Because the warm-path message fires after every check (i.e. on essentially every keystroke when `lsp-ltex-plus-check-frequency` is `"edit"` and the debounce interval is small), it is intended for investigation only. Turn the flag off again when you are done measuring. For richer diagnostic output — including entries in the `*lsp-ltex-plus::client*` log buffer and raw JSON-RPC dumps under `/tmp` — see `lsp-ltex-plus-debug` instead; the two flags are independent and can be combined.
 
 ### Lsp-mode Protocol Patch
 
