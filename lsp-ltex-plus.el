@@ -929,7 +929,7 @@ measurements."
     ;; path inside `:initialized-fn' re-registers the client with the flag
     ;; cleared if the server does not advertise workspace folders support.
     :multi-root lsp-ltex-plus-multi-root
-    :initialized-fn (lambda (workspace)
+    :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
                       (lsp-notify "workspace/didChangeConfiguration"
                                   `(:settings (:ltex (:enabled ,(vconcat (lsp-ltex-plus--enabled-languages))
