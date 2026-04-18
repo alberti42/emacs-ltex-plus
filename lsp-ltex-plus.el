@@ -627,6 +627,55 @@ ORIG-FN for every other WORKSPACE."
       nil
     (funcall orig-fn workspace params)))
 
+;;;; -- Latency Benchmarking ---------------------------------------------------
+
+;; When `lsp-ltex-plus-debug' is non-nil, measure the round-trip between
+;; `textDocument/didChange' (outgoing) and `textDocument/publishDiagnostics'
+;; (incoming) for the ltex-ls-plus workspace, and report the elapsed time in
+;; milliseconds to the `*lsp-ltex-plus::client*' log.  Useful for comparing
+;; local vs. remote LanguageTool backends.
+;;
+;; Notes:
+;; - Consecutive edits debounce in `lsp-mode'; we measure from the moment the
+;;   debounced/immediate `lsp-notify' actually fires, i.e. from when the server
+;;   becomes aware of the new buffer state.
+;; - If several didChange fire before any diagnostics arrive, the most recent
+;;   timestamp overwrites the previous one — the reported figure is always the
+;;   latency from the *latest* change to its next publishDiagnostics.
+
+(defvar lsp-ltex-plus--did-change-timestamps (make-hash-table :test 'eq)
+  "Per-workspace map of pending `textDocument/didChange' timestamps.
+Each value is a cons (TIMESTAMP . BUFFER).  Consumed when the matching
+`textDocument/publishDiagnostics' arrives.")
+
+(defun lsp-ltex-plus--benchmark-didchange (orig-fn method params)
+  "Record the dispatch time of `textDocument/didChange' to ltex-ls-plus.
+Around-advice for `lsp-notify'.  ORIG-FN, METHOD and PARAMS are forwarded
+unchanged; the advice only observes the call."
+  (when (and lsp-ltex-plus-debug
+             (equal method "textDocument/didChange")
+             (bound-and-true-p lsp--cur-workspace)
+             (eq 'ltex-ls-plus
+                 (lsp--workspace-server-id lsp--cur-workspace)))
+    (puthash lsp--cur-workspace
+             (cons (current-time) (current-buffer))
+             lsp-ltex-plus--did-change-timestamps))
+  (funcall orig-fn method params))
+
+(defun lsp-ltex-plus--benchmark-diagnostics (workspace &rest _args)
+  "Log didChange→publishDiagnostics latency for ltex-ls-plus.
+After-advice for `lsp--on-diagnostics'; WORKSPACE is the workspace that
+just published diagnostics."
+  (when (and lsp-ltex-plus-debug
+             (eq 'ltex-ls-plus (lsp--workspace-server-id workspace)))
+    (when-let* ((entry (gethash workspace lsp-ltex-plus--did-change-timestamps))
+                (ts    (car entry))
+                (buf   (cdr entry)))
+      (lsp-ltex-plus--log "didChange → publishDiagnostics: %d ms (buffer: %s)"
+                          (lsp--ms-since ts)
+                          (buffer-name buf))
+      (remhash workspace lsp-ltex-plus--did-change-timestamps))))
+
 ;;;; -- Lsp-mode Registration --------------------------------------------------
 
 (defun lsp-ltex-plus--setup ()
@@ -653,6 +702,14 @@ ORIG-FN for every other WORKSPACE."
   ;; setup do not stack advices.
   (advice-add 'lsp-on-progress-modeline :around
               #'lsp-ltex-plus--suppress-progress)
+
+  ;; didChange→publishDiagnostics latency benchmark.  Installed
+  ;; unconditionally; the handlers themselves are gated by
+  ;; `lsp-ltex-plus-debug' so there is no runtime cost when debug is off.
+  (advice-add 'lsp-notify :around
+              #'lsp-ltex-plus--benchmark-didchange)
+  (advice-add 'lsp--on-diagnostics :after
+              #'lsp-ltex-plus--benchmark-diagnostics)
 
   (lsp-ltex-plus--load-external-settings)
 
