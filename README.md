@@ -274,15 +274,16 @@ Once active, LTeX+ works just like any other LSP server:
     - Disable a specific rule you don't like.
     - Ignore a false positive.
 
-### Manual activation in any buffer
+### Toggling grammar checking in a buffer
 
-If you used `:restrict-to` or `:exclude` when calling `lsp-ltex-plus-enable-for-modes`, some buffers will not trigger automatic activation. You can still enable grammar checking in any buffer on demand with:
+`lsp-ltex-plus-mode` is a standard Emacs minor mode: `M-x lsp-ltex-plus-mode` toggles it on and off in the current buffer. In practice this means:
 
-```
-M-x lsp-ltex-plus-mode
-```
+- **Disable** in a buffer where it auto-activated — for example, while you write a throwaway draft that you don't want flagged. Diagnostics disappear, the `LTeX+` mode-line lighter is removed, and running `M-x lsp-ltex-plus-mode` again re-enables it.
+- **Enable** in a buffer where automatic activation did not fire — because the major mode was filtered out by `:restrict-to` / `:exclude`, or because it is a programming language and `lsp-ltex-plus-check-programming-languages` is nil. The client starts immediately; you do not need to flip any global variable first.
 
-If the current major mode is not in `lsp-ltex-plus-major-modes`, you will be prompted for a VS Code language identifier (press `RET` to accept the default `"plaintext"`). The mode is then registered and the grammar checker starts immediately. When called from a hook or from Lisp rather than interactively, `"plaintext"` is used silently without prompting.
+If the current major mode is not yet in `lsp-ltex-plus-major-modes`, you will be prompted for a [VS Code language identifier](https://code.visualstudio.com/docs/languages/identifiers) (press `RET` to accept the default `"plaintext"`). The mode is then registered and the grammar checker starts immediately. When called from a hook rather than interactively, `"plaintext"` is used silently without prompting.
+
+Deactivation is properly scoped: when the mode is turned off in a buffer where other LSP servers are also active (e.g. `texlab` for LaTeX, `basedpyright` for Python), only the LTeX+ workspace is detached and its diagnostics are cleared; the co-tenant servers keep running untouched. The mode is also re-entrant — toggling it off and on repeatedly in the same buffer works cleanly.
 
 > **Why two tables?**  lsp-mode uses `lsp-language-id-configuration` to decide the language ID string sent over the wire (in `textDocument/didOpen` and similar messages). Most common modes — Markdown, Org, LaTeX, plain text — already have entries there from lsp-mode's built-in defaults, so they work without any extra step. Modes outside that list (e.g. `fundamental-mode`) have no default entry, which is why `lsp-ltex-plus-mode` adds the mode to both `lsp-ltex-plus-major-modes` and `lsp-language-id-configuration` simultaneously.
 
