@@ -536,13 +536,17 @@ For users who go the other way and pick only a handful of modes with `:restrict-
 
 ## Why this package?
 
-Previously, the only available option was [lsp-ltex](https://github.com/emacs-languagetool/lsp-ltex). However, that package had not been updated to support the newer **plus** version of the server (`ltex-ls-plus`), and it suffered from persistent instability—at least on my setup using Emacs 31.0.50.
+Two Emacs LSP clients for LTeX already existed before this package:
 
-More importantly, I simply could not get the original package to run reliably; in fact, it rarely managed more than a few corrections before the communication with the server crashed. I spent numerous hours trying to diagnose the issue, but I couldn't find a fix. While it might work fine for others on different versions of Emacs, I found it impossible to maintain a stable workflow where the spell checker could survive more than a few edits.
+- [`emacs-languagetool/lsp-ltex`](https://github.com/emacs-languagetool/lsp-ltex) — the original client, targeted at the older `ltex-ls` server.
+- [`emacs-languagetool/lsp-ltex-plus`](https://github.com/emacs-languagetool/lsp-ltex-plus) — a more recent variant by the same author, with function and variable prefixes renamed and the client retargeted at `ltex-ls-plus`. From a reading of its source, the renaming is the only substantive change, so it shares the original's architecture. For that reason the [detailed comparison](docs/comparison-lsp-ltex.md) treats the two as one family and refers to them jointly as `lsp-ltex`.
 
-To solve this, I decided to rewrite the client from scratch, specifically modernized for LTeX+. By rebuilding the entire communication chain—starting with direct command-line interrogation of the server—I was able to understand exactly how the server and client interact. This deep dive allowed me to identify and fix the underlying protocol issues described in the [Lsp-mode Protocol Patch](#lsp-mode-protocol-patch) section above. The result is a lightweight, reliable client that handles the full JSON-RPC communication without the deadlocks or crashes I encountered before.
+> **Note on the name collision.** The overlap with `emacs-languagetool/lsp-ltex-plus` is unintentional — I was not aware of that project when I chose the name for this one. The two packages are independent; they simply converged on the same label.
 
-If you want to know more, see:
+The motivation for writing a new client was practical: on my setup the existing client reliably stalled after a handful of edits — the server stopped publishing diagnostics and a workspace restart was needed to recover. Tracing that symptom led to the JSON-RPC ID-collision issue documented in [Lsp-mode Protocol Patch](#lsp-mode-protocol-patch), and from there to a from-scratch implementation designed specifically for `ltex-ls-plus`. Rebuilding the communication chain — starting with direct command-line interrogation of the server — made it possible to understand exactly how the server and client interact. The result is a lightweight client built around `ltex-ls-plus`'s actual behaviour (bi-directional server-initiated requests, full document sync, server-pulled configuration) rather than inheriting a design tuned for the older `ltex-ls`.
+
+If you want to dig deeper:
+
 - [Detailed Technical Comparison between `lsp-ltex` and `lsp-ltex-plus`](docs/comparison-lsp-ltex.md)
 - [What is New with LTeX+?](docs/what-is-new-with-ltex-plus.md)
 
