@@ -291,8 +291,7 @@ You can configure these using `:custom` in `use-package`:
   (lsp-ltex-plus-language "en-GB"))
 ```
 
-<details>
-<summary><b>Click to see the full list of supported parameters</b></summary>
+### Full list of supported parameters
 
 | Parameter | Description | Official LTeX+ Setting |
 | :--- | :--- | :---: |
@@ -323,9 +322,11 @@ You can configure these using `:custom` in `use-package`:
 | `lsp-ltex-plus-diagnostic-severity` | Severity of the diagnostics (error, warning, information, hint). | X |
 | `lsp-ltex-plus-check-frequency` | Controls when documents should be checked (edit, save, manual). | X |
 | `lsp-ltex-plus-clear-diagnostics-when-closing-file` | Whether to clear diagnostics when a file is closed. | X |
-| `lsp-ltex-plus-show-progress` | When non-nil (default), show `ltex-ls-plus` progress updates in the mode line (the `⌛` prefix and optional spinner). Set to nil to silence the flicker on every keystroke without affecting progress rendering for other LSP clients. | || `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
-| `lsp-ltex-plus-show-latency` | When non-nil, echo the server round-trip time after every check. Reports both the cold start (`"Completed initial spell check in N ms."` after `textDocument/didOpen`) and the warm path (`"Completed spell check in N ms."` after each `textDocument/didChange`). Off by default; see [Measuring Server Latency](#measuring-server-latency). | |
+| `lsp-ltex-plus-show-progress` | When non-nil (default), show `ltex-ls-plus` progress updates in the mode line (the `⌛` prefix and optional spinner). Set to nil to silence the flicker on every keystroke without affecting progress rendering for other LSP clients. **Read at startup only** — see the note below the table. | || `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
+| `lsp-ltex-plus-show-latency` | When non-nil, echo the server round-trip time after every check. Reports both the cold start (`"Completed initial spell check in N ms."` after `textDocument/didOpen`) and the warm path (`"Completed spell check in N ms."` after each `textDocument/didChange`). Off by default; see [Measuring Server Latency](#measuring-server-latency). **Read at startup only** — see the note below the table. | |
 | `lsp-ltex-plus-multi-root` | When non-nil (default), register the client as multi-root so a single `ltex-ls-plus` JVM handles all folders in the session. Leave enabled unless you have a specific need to isolate projects — disabling it spawns one JVM per project root, which can balloon memory usage. | |
+
+> **Note — startup-only settings.** `lsp-ltex-plus-show-progress` and `lsp-ltex-plus-show-latency` are read once when `lsp-ltex-plus` initialises (the first time a supported buffer is opened in the Emacs session). Each one controls an `advice-add` that is installed at that moment only if the flag has the appropriate value; changing the flag afterwards with `setq` or `customize-set-variable` does not install or remove the advice retroactively. To make a mid-session change take effect, restart Emacs or call `M-: (lsp-ltex-plus--setup)` to re-run the client setup.
 
 </details>
 
