@@ -618,10 +618,10 @@ response IDs."
   (advice-add 'lsp--parser-on-message :override #'lsp-core--parser-on-message-patch))
 
 (defun lsp-ltex-plus--suppress-progress (orig-fn workspace params)
-  "Swallow ltex-ls-plus progress notifications when
-`lsp-ltex-plus-show-progress' is nil.  Around-advice for
-`lsp-on-progress-modeline'; passes through to ORIG-FN for every
-other workspace."
+  "Swallow ltex-ls-plus progress notifications.
+Notifications are silenced when `lsp-ltex-plus-show-progress' is nil.
+Around-advice for `lsp-on-progress-modeline'; passes PARAMS through to
+ORIG-FN for every other WORKSPACE."
   (if (and (not lsp-ltex-plus-show-progress)
            (eq 'ltex-ls-plus (lsp--workspace-server-id workspace)))
       nil
