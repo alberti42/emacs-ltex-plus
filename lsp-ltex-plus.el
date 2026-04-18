@@ -86,7 +86,7 @@ enabling comment checking in 30+ languages.
 This flag only affects client-side activation.  The `ltex.enabled\\='
 list sent to the server always contains every supported language ID from
 `lsp-ltex-plus-major-modes\\='; the dispatcher is the authoritative
-gate.  Explicit interactive calls (`M-x lsp-ltex-plus-mode\\=') always
+gate.  Explicit interactive calls (M-x `lsp-ltex-plus-mode\\=') always
 proceed regardless of this flag, so on-demand grammar checks work in any
 supported buffer without toggling this global setting.
 
@@ -99,6 +99,29 @@ are checked; trailing/inline comments after code on the same line are
 regex tables.  The common effect is to minimise false positives from
 commented-out code.  Python comments are parsed as reStructuredText;
 all others are parsed as Markdown."
+  :type 'boolean
+  :group 'lsp-ltex-plus)
+
+(defcustom lsp-ltex-plus-multi-root t
+  "When non-nil, register the ltex-ls-plus client as multi-root.
+
+This is the default and recommended setting.  With multi-root enabled,
+a single `ltex-ls-plus\\=' JVM process handles all folders in the Emacs
+session, avoiding the memory cost of one process per project root.
+
+Best supported by an `ltex-ls-plus\\=' binary that advertises workspace
+folders support in its `initialize\\=' response.  If your server does
+not advertise the capability, multi-root traffic (the `workspaceFolders\\='
+init param and the `workspace/didChangeWorkspaceFolders\\=' notification)
+is still sent — per the LSP spec, servers must ignore unknown params
+and notifications, and `lsp4j'-based servers do — so grammar checking
+continues to work correctly.  However, the client logs a one-shot
+warning on the first activation asking you to set this variable to nil
+in your configuration until the server is upgraded, so that the
+unsupported traffic stops.
+
+Tracking upstream: <TBD: URL of the ltex-ls-plus PR adding workspace
+folders support>."
   :type 'boolean
   :group 'lsp-ltex-plus)
 
@@ -575,6 +598,46 @@ response IDs."
 
 ;;;; -- Lsp-mode Registration --------------------------------------------------
 
+(defun lsp-ltex-plus--server-supports-workspace-folders-p (workspace)
+  "Return non-nil if WORKSPACE's server advertises workspace folders.
+Reads the `workspace.workspaceFolders.supported\\=' capability from
+the `initialize\\=' response stored on the workspace."
+  (-some-> (lsp--workspace-server-capabilities workspace)
+    (lsp:server-capabilities-workspace?)
+    (lsp:workspace-server-capabilities-workspace-folders?)
+    (lsp:workspace-folders-options-supported?)))
+
+(defvar lsp-ltex-plus--multi-root-warning-shown nil
+  "Non-nil after warning has fired in this session.
+Used in `lsp-ltex-plus--warn-missing-workspace-folders' to avoid
+ re-warning on every server restart when `lsp-ltex-plus-multi-root' is
+ set but the server does not advertise workspace folders support.  Reset
+ to nil (e.g. with `(setq lsp-ltex-plus--multi-root-warning-shown
+ nil)\\=') to force the warning to appear again.")
+
+(defun lsp-ltex-plus--warn-missing-workspace-folders ()
+  "Emit a loud, one-shot warning about missing workspace folders support.
+
+Called from `:initialized-fn\\=' when `lsp-ltex-plus-multi-root\\=' is
+non-nil but the server does not advertise the capability.  Sending
+multi-root traffic to such a server is safe in practice — the LSP spec
+mandates that servers ignore unknown params and notifications, and
+`lsp4j' does so — so we do not tear down or restart anything.  We just
+tell the user to opt out of `lsp-ltex-plus-multi-root\\=' until their
+server is upgraded."
+  (unless lsp-ltex-plus--multi-root-warning-shown
+    (setq lsp-ltex-plus--multi-root-warning-shown t)
+    (lsp--warn
+     (concat "[lsp-ltex-plus] ltex-ls-plus does not advertise workspace "
+             "folders support, but `lsp-ltex-plus-multi-root' is t.  "
+             "Multi-root traffic will still be sent and silently ignored "
+             "by the server (per the LSP spec), so grammar checking "
+             "continues to work — but to silence this warning and stop "
+             "sending unsupported notifications, set "
+             "`lsp-ltex-plus-multi-root' to nil in your configuration "
+             "until your server is upgraded.  "
+             "Tracking upstream: <TBD: PR URL>."))))
+
 (defun lsp-ltex-plus--setup ()
   "Initialize and register the ltex-ls-plus client with `lsp-mode'."
   (setq lsp-ltex-plus--start-time (current-time))
@@ -662,7 +725,11 @@ response IDs."
     ;; "hijack" primary LSP features (Go to Definition, Completion, etc.).
     :add-on? t
     :priority -1
-    :initialized-fn (lambda (_workspace)
+    ;; `:multi-root' reads the defcustom at registration time.  The fallback
+    ;; path inside `:initialized-fn' re-registers the client with the flag
+    ;; cleared if the server does not advertise workspace folders support.
+    :multi-root lsp-ltex-plus-multi-root
+    :initialized-fn (lambda (workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
                       (lsp-notify "workspace/didChangeConfiguration"
                                   `(:settings (:ltex (:enabled ,(vconcat (lsp-ltex-plus--enabled-languages))
@@ -690,7 +757,11 @@ response IDs."
                                                                :diagnosticSeverity ,lsp-ltex-plus-diagnostic-severity
                                                                :checkFrequency ,lsp-ltex-plus-check-frequency
                                                                :clearDiagnosticsWhenClosingFile ,lsp-ltex-plus-clear-diagnostics-when-closing-file
-                                                               :trace (:server ,lsp-ltex-plus-trace-server))))))
+                                                               :trace (:server ,lsp-ltex-plus-trace-server)))))
+                      (when (and lsp-ltex-plus-multi-root
+                                 (not (lsp-ltex-plus--server-supports-workspace-folders-p
+                                       workspace)))
+                        (lsp-ltex-plus--warn-missing-workspace-folders)))
     :action-handlers
     (lsp-ht ("_ltex.addToDictionary"     #'lsp-ltex-plus--action-add-to-dictionary)
             ("_ltex.disableRules"       #'lsp-ltex-plus--action-disable-rules)
