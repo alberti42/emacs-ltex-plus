@@ -36,6 +36,8 @@ LTeX+ can operate in two distinct ways, depending on your needs:
 - **Highly Configurable:** Easily switch languages, enable "picky" grammar rules, or connect to a premium LanguageTool account.
 - **Wide Language Support:** Pre-configured for Markdown, LaTeX, Org, RestructuredText, HTML, BibTeX, and many others.
 - **Programming Language Support:** Optionally checks grammar and spelling in comments of 30+ programming languages (Python, C, C++, Rust, Java, …), running transparently alongside the primary language server thanks to its add-on design. Disabled by default (matching LTeX+), opt-in via `lsp-ltex-plus-check-programming-languages`.
+- **Lightweight & Lazy-loading:** Split into a tiny bootstrap file loaded at Emacs startup and a full client loaded on first use of a supported buffer, so startup time is essentially unaffected.
+- **Intuitive API:** A deliberately small surface area — one entry point (`lsp-ltex-plus-enable-for-modes`) plus customisation variables under a consistent `lsp-ltex-plus-` prefix, so configuration is discoverable through `customize-group` or tab-completion.
 
 ## Performance
 
