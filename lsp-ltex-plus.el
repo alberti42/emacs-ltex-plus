@@ -102,6 +102,27 @@ all others are parsed as Markdown."
   :type 'boolean
   :group 'lsp-ltex-plus)
 
+(defcustom lsp-ltex-plus-show-progress t
+  "When non-nil (default), show ltex-ls-plus progress in the mode line.
+
+Progress updates from `ltex-ls-plus\\=' typically complete in ~100 ms,
+so the `⌛\\=' prefix (plus optional spinner animation) can flicker
+distractingly on every keystroke.  Users who find this bothersome
+should set this variable to nil; progress is then silenced for
+ltex-ls-plus only, while other LSP clients continue to render their
+progress normally.
+
+The default is t because the filtering mechanism is a narrow
+`advice-add\\=' around `lsp-on-progress-modeline\\=' — the default
+value of `lsp-progress-function\\=' in `lsp-mode\\='.  Advice on
+third-party internals is fragile, so we ship in the pass-through
+state by default and leave the opt-in to users who actually mind the
+flicker.  Users who have replaced `lsp-progress-function\\=' with a
+custom handler are not affected by the advice and should filter on
+`lsp--workspace-server-id\\=' themselves."
+  :type 'boolean
+  :group 'lsp-ltex-plus)
+
 (defcustom lsp-ltex-plus-multi-root t
   "When non-nil, register the ltex-ls-plus client as multi-root.
 
@@ -596,6 +617,16 @@ deadlocks when server-initiated requests collide with client
 response IDs."
   (advice-add 'lsp--parser-on-message :override #'lsp-core--parser-on-message-patch))
 
+(defun lsp-ltex-plus--suppress-progress (orig-fn workspace params)
+  "Swallow ltex-ls-plus progress notifications when
+`lsp-ltex-plus-show-progress' is nil.  Around-advice for
+`lsp-on-progress-modeline'; passes through to ORIG-FN for every
+other workspace."
+  (if (and (not lsp-ltex-plus-show-progress)
+           (eq 'ltex-ls-plus (lsp--workspace-server-id workspace)))
+      nil
+    (funcall orig-fn workspace params)))
+
 ;;;; -- Lsp-mode Registration --------------------------------------------------
 
 (defun lsp-ltex-plus--setup ()
@@ -615,6 +646,13 @@ response IDs."
 
   (when lsp-ltex-plus-apply-kind-first-patch
     (lsp-ltex-plus--apply-lsp-mode-patch))
+
+  ;; Filter ltex-ls-plus progress notifications out of the mode line unless
+  ;; the user opts back in via `lsp-ltex-plus-show-progress'.  `advice-add'
+  ;; is idempotent for the same symbol + function pair, so re-runs of this
+  ;; setup do not stack advices.
+  (advice-add 'lsp-on-progress-modeline :around
+              #'lsp-ltex-plus--suppress-progress)
 
   (lsp-ltex-plus--load-external-settings)
 

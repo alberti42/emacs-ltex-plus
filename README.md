@@ -323,7 +323,7 @@ You can configure these using `:custom` in `use-package`:
 | `lsp-ltex-plus-diagnostic-severity` | Severity of the diagnostics (error, warning, information, hint). | X |
 | `lsp-ltex-plus-check-frequency` | Controls when documents should be checked (edit, save, manual). | X |
 | `lsp-ltex-plus-clear-diagnostics-when-closing-file` | Whether to clear diagnostics when a file is closed. | X |
-| `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
+| `lsp-ltex-plus-show-progress` | When non-nil (default), show `ltex-ls-plus` progress updates in the mode line (the `⌛` prefix and optional spinner). Set to nil to silence the flicker on every keystroke without affecting progress rendering for other LSP clients. | || `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
 | `lsp-ltex-plus-multi-root` | When non-nil (default), register the client as multi-root so a single `ltex-ls-plus` JVM handles all folders in the session. Leave enabled unless you have a specific need to isolate projects — disabling it spawns one JVM per project root, which can balloon memory usage. | |
 
 </details>
