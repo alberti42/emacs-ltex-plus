@@ -174,8 +174,14 @@ activation into buffers the user did not select.")
   "Enable `lsp-ltex-plus-mode' when `major-mode' is in the enabled set.
 Attached once to `after-change-major-mode-hook' by
 `lsp-ltex-plus-enable-for-modes'.  The full `lsp-ltex-plus' package is loaded
-lazily on the first call that reaches `lsp-ltex-plus-mode'."
-  (when (memq major-mode lsp-ltex-plus--enabled-modes)
+lazily on the first call that reaches `lsp-ltex-plus-mode'.
+
+Buffers without a file name are skipped, since `lsp-mode's machinery
+is built around `file://' URIs.  This filters out transient buffers
+created by other modes (e.g., markdown-mode's syntax-highlighting
+helpers that spawn buffers in `python-ts-mode')."
+  (when (and (memq major-mode lsp-ltex-plus--enabled-modes)
+             (buffer-file-name))
     (lsp-ltex-plus-mode 1)))
 
 ;;;###autoload
