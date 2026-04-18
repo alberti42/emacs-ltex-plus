@@ -824,8 +824,12 @@ silently."
               (push (cons major-mode lang-id) lsp-language-id-configuration)))
           (if (not (executable-find lsp-ltex-plus-ls-plus-executable))
               (progn
-                (message "[lsp-ltex-plus] Aborting: %s not found on PATH."
-                         lsp-ltex-plus-ls-plus-executable)
+                (message
+                 (concat "[lsp-ltex-plus] Aborting: %s not found on PATH.  "
+                         "See installation instructions at "
+                         "https://github.com/alberti42/emacs-ltex-plus/#server-installation "
+                         "or set `lsp-ltex-plus-ls-plus-executable' to the absolute path of the binary.")
+                 lsp-ltex-plus-ls-plus-executable)
                 (setq lsp-ltex-plus-mode nil))
             (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
             (funcall lsp-ltex-plus-buffer-setup-function)
