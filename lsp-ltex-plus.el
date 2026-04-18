@@ -674,13 +674,30 @@ ORIG-FN for every other WORKSPACE."
 ;;                                   and warm-path (didChange) cases so the
 ;;                                   two numbers can be read off at a glance.
 ;;
-;; Either, both, or neither can be enabled at any time.  The benchmark only
-;; reflects server-side latency; the subsequent flycheck/flymake rendering
-;; step is not included (see `lsp-ltex-plus-show-latency' docstring).
+;; The benchmark only reflects server-side latency; the subsequent
+;; flycheck/flymake rendering step is not included (see the
+;; `lsp-ltex-plus-show-latency' docstring).
 ;;
 ;; When lsp-mode flushes a debounced didChange, we time from that flush — not
 ;; from the user's keystroke — so the number reflects "server became aware of
 ;; the new state → diagnostics returned", which is what we want to report.
+;;
+;; The two advices are installed at setup time only when
+;; `lsp-ltex-plus-show-latency' is non-nil.  `lsp-ltex-plus-debug' does not gate
+;; installation directly; instead, when debug mode is on, the sticky-defaults
+;; block inside `lsp-ltex-plus--setup' turns `lsp-ltex-plus-show-latency' on
+;; implicitly, so the debug user gets the benchmark "for free".
+;;
+;; Flipping `lsp-ltex-plus-show-latency' later in the session does not install
+;; the advice retroactively: `lsp-ltex-plus--setup' fires once, via
+;; `with-eval-after-load', when `lsp-mode' is first loaded, and is not
+;; re-entered by `lsp-restart-workspace' (that only restarts the server
+;; process).  To start measuring mid-session, either re-evaluate the two
+;; `advice-add' forms below or call `lsp-ltex-plus--setup' again (it is
+;; idempotent).  This prevent the benchmark — a basic, investigative tool that
+;; is off in everyday use — from installing leaving advice on
+;; `lsp--on-diagnostics', which is a private `lsp-mode' function whose signature
+;; may change between versions.
 ;;
 ;; CURRENT LIMITATIONS OF BENCHMARKS
 ;;
@@ -732,17 +749,18 @@ matching `textDocument/publishDiagnostics' arrives.")
     ("textDocument/didChange" . "incremental"))
   "Mapping of outgoing LSP method names to benchmark labels.")
 
-(defsubst lsp-ltex-plus--benchmark-enabled-p ()
-  "Return non-nil when any latency reporter is active."
-  (or lsp-ltex-plus-debug lsp-ltex-plus-show-latency))
-
 (defun lsp-ltex-plus--benchmark-outgoing (orig-fn method params)
   "Record the dispatch time of trigger notifications sent to ltex-ls-plus.
 Around-advice for `lsp-notify'.  METHOD is matched against
 `lsp-ltex-plus--benchmark-method-labels'; unrelated methods are ignored.
 ORIG-FN and PARAMS are forwarded unchanged; the advice only observes the
-call."
-  (when-let* (((lsp-ltex-plus--benchmark-enabled-p))
+call.
+
+Gated on `lsp-ltex-plus-show-latency' so toggling the flag off mid-session
+silences reporting immediately, even though the advice itself remains
+installed until Emacs is restarted (it is only installed at startup when
+the flag is on in the first place)."
+  (when-let* ((lsp-ltex-plus-show-latency)
               ((bound-and-true-p lsp--cur-workspace))
               ((eq 'ltex-ls-plus
                    (lsp--workspace-server-id lsp--cur-workspace)))
@@ -756,12 +774,15 @@ call."
 (defun lsp-ltex-plus--benchmark-diagnostics (workspace &rest _args)
   "Report server latency for ltex-ls-plus after diagnostics arrive.
 After-advice for `lsp--on-diagnostics'; WORKSPACE is the workspace that
-just published diagnostics.  Output sinks are controlled by
-`lsp-ltex-plus-debug' (log buffer) and `lsp-ltex-plus-show-latency'
-\(echo area).  The echo-area wording differs for cold-start (didOpen →
-\"initial spell check\") and warm-path (didChange → \"spell check\")
+just published diagnostics.  The echo-area message is emitted
+unconditionally (reaching this advice implies
+`lsp-ltex-plus-show-latency' was non-nil at setup time); the log-buffer
+entry is additionally emitted when `lsp-ltex-plus-debug' is non-nil.
+
+The echo-area wording differs for cold-start (didOpen → \"initial
+spell check\") and warm-path (didChange → \"spell check\")
 measurements."
-  (when (and (lsp-ltex-plus--benchmark-enabled-p)
+  (when (and lsp-ltex-plus-show-latency
              (eq 'ltex-ls-plus (lsp--workspace-server-id workspace)))
     (when-let* ((entry   (gethash workspace lsp-ltex-plus--pending-measurements))
                 (ts      (nth 0 entry))
@@ -778,9 +799,8 @@ measurements."
                                 "didOpen"
                               "didChange")
                             elapsed (buffer-name buf)))
-      (when lsp-ltex-plus-show-latency
-        (let ((message-log-max nil))
-          (message "Completed %s in %d ms." phrase elapsed)))
+      (let ((message-log-max nil))
+        (message "Completed %s in %d ms." phrase elapsed))
       (remhash workspace lsp-ltex-plus--pending-measurements))))
 
 ;;;; -- Lsp-mode Registration --------------------------------------------------
@@ -810,19 +830,13 @@ measurements."
   (advice-add 'lsp-on-progress-modeline :around
               #'lsp-ltex-plus--suppress-progress)
 
-  ;; didChange→publishDiagnostics latency benchmark.  Installed
-  ;; unconditionally; the handlers themselves are gated by
-  ;; `lsp-ltex-plus-debug' so there is no runtime cost when debug is off.
-  (advice-add 'lsp-notify :around
-              #'lsp-ltex-plus--benchmark-outgoing)
-  (advice-add 'lsp--on-diagnostics :after
-              #'lsp-ltex-plus--benchmark-diagnostics)
-
-  (lsp-ltex-plus--load-external-settings)
-
-  ;; Apply sticky debug defaults.
+  ;; Apply sticky debug defaults.  Must run before the benchmark advice install
+  ;; below, because enabling debug mode here implicitly turns on
+  ;; `lsp-ltex-plus-show-latency' — the sole gate for the benchmark advice
+  ;; install — so a debug-only user still gets latency readings.
   (when lsp-ltex-plus-debug
     (setq lsp-log-io t)
+    (setq lsp-ltex-plus-show-latency t)
     (when (string= lsp-ltex-plus-trace-server "off")
       ;; We already record the raw JSON-RPC exchange to
       ;; /tmp/ltex-server-input.log and /tmp/ltex-server-output.log, therefore
@@ -830,6 +844,20 @@ measurements."
       ;; choose messages for pretty-print, which is especially useful for large
       ;; payloads.
       (setq lsp-ltex-plus-trace-server "messages")))
+
+  ;; Latency benchmark advice — only installed if the user asked for it at
+  ;; startup (directly via `lsp-ltex-plus-show-latency', or indirectly by
+  ;; enabling `lsp-ltex-plus-debug' above).  Flipping the flag mid-session does
+  ;; not install the advice retroactively; see the Latency Benchmarking section
+  ;; comment for why we prefer not to keep this advice around when nobody is
+  ;; measuring.
+  (when lsp-ltex-plus-show-latency
+    (advice-add 'lsp-notify :around
+                #'lsp-ltex-plus--benchmark-outgoing)
+    (advice-add 'lsp--on-diagnostics :after
+                #'lsp-ltex-plus--benchmark-diagnostics))
+
+  (lsp-ltex-plus--load-external-settings)
 
   (lsp-ltex-plus--log "Registering settings and client...")
   (lsp-ltex-plus--log "Registering ltex-ls-plus client (priority: -1)...")
