@@ -37,6 +37,17 @@ LTeX+ can operate in two distinct ways, depending on your needs:
 - **Wide Language Support:** Pre-configured for Markdown, LaTeX, Org, RestructuredText, HTML, BibTeX, and many others.
 - **Programming Language Support:** Optionally checks grammar and spelling in comments of 30+ programming languages (Python, C, C++, Rust, Java, …), running transparently alongside the primary language server thanks to its add-on design. Disabled by default (matching LTeX+), opt-in via `lsp-ltex-plus-check-programming-languages`.
 
+## Performance
+
+`lsp-ltex-plus` is fast. On an Apple M2, grammar checking a full-page Markdown or Org buffer completes in about **70 ms**, and a longer LaTeX document (around 15 KB) in about **150 ms** — both comfortably inside the threshold that feels instantaneous while typing. The package ships with a small built-in benchmark (`lsp-ltex-plus-show-latency`) that echoes the round-trip time to the minibuffer after every check, so you can reproduce these numbers on your own hardware; see [Measuring Server Latency](#measuring-server-latency) for how to enable it.
+
+Two caveats worth stating honestly:
+
+- **What you *see* on screen is slower than what the server reports.** The figures above measure the round-trip from `textDocument/didChange` to `textDocument/publishDiagnostics`. Between `publishDiagnostics` arriving and the squiggly underline appearing in the buffer, Emacs still has to pass the diagnostic through `lsp-mode`'s idle cadence (`lsp-idle-delay`, default 0.5 s), the full-sync debounce, and the Flycheck / Flymake overlay refresh. With stock settings the visible delay can add several hundred milliseconds on top of the server round-trip. The grammar checker is not the bottleneck in an Emacs session — the display pipeline typically is. Normal users, however, would likely find Emacs' default settings quite acceptable when typing or editing texts. 
+
+  For a snappier response, consider lowering `lsp-idle-delay` (default 0.5 s), `flycheck-idle-change-delay` (default 0.5 s), and `lsp-debounce-full-sync-notifications-interval` (default 1.0 s). The last of these races against a secondary flush path in lsp-mode that fires whenever Emacs is about to send any outgoing LSP message — a completion request, a hover, a periodic `textDocument/documentHighlight` fired by `lsp-on-idle-hook` after `lsp-idle-delay` seconds of inactivity, or even traffic from a co-tenant server on the same buffer. Whichever of the two paths fires first drains the queue, so reducing the interval only starts to bite once it drops below typical inter-message times (~`lsp-idle-delay`). If you want the interval to be the sole flush trigger — useful mainly when benchmarking or reasoning about timing — additionally set `(setq lsp-flush-delayed-changes-before-next-message nil)` to temporarily disable the secondary flush path.
+- **A remote LanguageTool server is noticeably slower.** If you point `lsp-ltex-plus-lt-server-uri` at the hosted service, the round-trip stretches to roughly **1–4 seconds** depending on network conditions and how busy the service is. That is the trade-off for Premium-only rules, but the local backend is likely what the majority of users may want for an interactive writing experience.
+
 ## Prerequisites
 
 Before using this package, you need:
