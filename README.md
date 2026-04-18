@@ -403,17 +403,15 @@ Note that this setting only matters when the **last** buffer using `ltex-ls-plus
 pgrep -afl 'ltex-ls-plus|ltex.ls.plus'
 ```
 
-**Explanation:** `lsp-mode` keys its workspaces on `(client, project-root)`. Each distinct project root — for files inside a git repo, the repo root; for loose files outside any project, typically the file's own directory — creates its own workspace. Because `ltex-ls-plus` does not yet advertise support for `workspace.workspaceFolders` in its LSP capabilities, `lsp-mode` cannot reuse a single server across multiple roots and must spawn a fresh JVM for each. Ten `.md` files in ten unrelated directories → ten JVMs.
+**Possible explanation:** `lsp-ltex-plus-multi-root` may have been set to `nil` somewhere in your configuration. When this variable is `nil`, each distinct project root (the git repo for files inside one, or the file's own directory for loose files) gets its own dedicated server process. With the default (`t`), a single server handles every supported buffer in the session regardless of where the files live.
 
-**Mitigation:** if memory pressure matters more to you than startup latency, set `lsp-keep-workspace-alive` to `nil`:
+**Fix:** confirm that `lsp-ltex-plus-multi-root` is at its default value of `t`:
 
 ```elisp
-(setq lsp-keep-workspace-alive nil)
+(setq lsp-ltex-plus-multi-root t)
 ```
 
-This shuts down each server when the last buffer attached to it is killed, at the cost of the cold-start delay the previous subsection discusses each time you return to such a buffer. Pick whichever trade-off fits your workflow.
-
-**Proper fix (upstream):** the underlying server would need to implement workspace folders support (`workspace/didChangeWorkspaceFolders` and related handshake). Since `ltex-ls-plus` holds no per-project state that materially differs between roots, one server could handle all folders in a single JVM. This requires a change in `ltex-ls-plus` itself; it is not fixable on the Emacs side.
+Unless you have a specific need to isolate projects (e.g., you are experimenting with per-project dictionaries or rule sets and want to keep them from bleeding across projects), leave this enabled. With it set to `t`, a single `ltex-ls-plus` process handles every supported buffer in the session regardless of how many unrelated directories those buffers come from.
 
 ### No Grammar Checking in Scratch or Anonymous Buffers
 
