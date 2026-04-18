@@ -717,6 +717,11 @@ just published diagnostics."
   (when lsp-ltex-plus-debug
     (setq lsp-log-io t)
     (when (string= lsp-ltex-plus-trace-server "off")
+      ;; We already record the raw JSON-RPC exchange to
+      ;; /tmp/ltex-server-input.log and /tmp/ltex-server-output.log, therefore
+      ;; setting "verbose" here would be too noisy for essentially no gain.  We
+      ;; choose messages for pretty-print, which is especially useful for large
+      ;; payloads.
       (setq lsp-ltex-plus-trace-server "messages")))
 
   (lsp-ltex-plus--log "Registering settings and client...")
