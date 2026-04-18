@@ -126,21 +126,33 @@ custom handler are not affected by the advice and should filter on
 (defcustom lsp-ltex-plus-show-latency nil
   "When non-nil, echo the server round-trip time after every check.
 
-The measurement runs from the moment `textDocument/didChange\\=' is
+Two distinct events are measured and reported with different wording
+so the two regimes can be distinguished at a glance:
+
+- `textDocument/didOpen\\='   → \"Completed initial spell check in N ms.\"
+- `textDocument/didChange\\=' → \"Completed spell check in N ms.\"
+
+The didOpen figure reflects a cold start: the server loads the
+document for the first time and runs LanguageTool against the full
+text.  The didChange figure reflects the warm path: incremental
+re-checks triggered by edits, served from the sentence cache where
+possible.  Reporting both makes it easy to quote numbers of the form
+\"first open: X ms, incremental edit: Y ms\".
+
+In both cases the timer runs from the moment the notification is
 dispatched to ltex-ls-plus until the matching
-`textDocument/publishDiagnostics\\=' arrives, and is reported with a
-message of the form \"Completed spell checking in N ms.\".
+`textDocument/publishDiagnostics\\=' arrives.
 
 This reports server-side latency only.  It does *not* include the
 subsequent `lsp-mode' / flycheck / flymake rendering step that draws
 the squiggles on screen, which typically adds several hundred
 milliseconds on top and dominates perceived responsiveness in Emacs.
 
-Off by default: with a short debounce interval the message fires on
-essentially every keystroke and the constant echo-area updates are
-distracting during normal editing.  Enable it when investigating
-latency (e.g. comparing local vs. remote LanguageTool backends) and
-disable it again afterwards."
+Off by default: with a short debounce interval the didChange message
+fires on essentially every keystroke and the constant echo-area
+updates are distracting during normal editing.  Enable it when
+investigating latency (e.g. comparing local vs. remote LanguageTool
+backends) and disable it again afterwards."
   :type 'boolean
   :group 'lsp-ltex-plus)
 
@@ -650,14 +662,17 @@ ORIG-FN for every other WORKSPACE."
 
 ;;;; -- Latency Benchmarking ---------------------------------------------------
 
-;; Measure the round-trip between `textDocument/didChange' (outgoing) and
-;; `textDocument/publishDiagnostics' (incoming) for the ltex-ls-plus
-;; workspace.  Two independent reporters consume the measurement:
+;; Measure the round-trip between trigger notifications sent to ltex-ls-plus
+;; (`textDocument/didOpen', `textDocument/didChange') and the matching
+;; `textDocument/publishDiagnostics' that the server returns.  Two independent
+;; reporters consume the measurement:
 ;;
 ;; - `lsp-ltex-plus-debug'         → timestamped entry in the
 ;;                                   `*lsp-ltex-plus::client*' log buffer.
-;; - `lsp-ltex-plus-show-latency'  → one-line echo-area message
-;;                                   (\"Completed spell checking in N ms.\").
+;; - `lsp-ltex-plus-show-latency'  → one-line echo-area message; phrased
+;;                                   differently for the cold-start (didOpen)
+;;                                   and warm-path (didChange) cases so the
+;;                                   two numbers can be read off at a glance.
 ;;
 ;; Either, both, or neither can be enabled at any time.  The benchmark only
 ;; reflects server-side latency; the subsequent flycheck/flymake rendering
@@ -667,52 +682,74 @@ ORIG-FN for every other WORKSPACE."
 ;; - Consecutive edits debounce in `lsp-mode'; we measure from the moment the
 ;;   debounced/immediate `lsp-notify' actually fires, i.e. from when the server
 ;;   becomes aware of the new buffer state.
-;; - If several didChange fire before any diagnostics arrive, the most recent
-;;   timestamp overwrites the previous one — the reported figure is always the
-;;   latency from the *latest* change to its next publishDiagnostics.
+;; - If several trigger notifications fire before any diagnostics arrive, the
+;;   most recent timestamp (and its label) overwrites the previous one.  In
+;;   normal flow this does not happen, because the server answers didOpen well
+;;   before the user starts typing, but in the edge case of "open then type
+;;   immediately" the reported figure is the latency from the *latest*
+;;   notification to its next publishDiagnostics.
 
-(defvar lsp-ltex-plus--did-change-timestamps (make-hash-table :test 'eq)
-  "Per-workspace map of pending `textDocument/didChange' timestamps.
-Each value is a cons (TIMESTAMP . BUFFER).  Consumed when the matching
-`textDocument/publishDiagnostics' arrives.")
+(defvar lsp-ltex-plus--pending-measurements (make-hash-table :test 'eq)
+  "Per-workspace map of pending latency measurements.
+Each value is a list (TIMESTAMP BUFFER LABEL) where LABEL is one of
+\"initial\" (didOpen) or \"incremental\" (didChange).  Consumed when the
+matching `textDocument/publishDiagnostics' arrives.")
+
+(defconst lsp-ltex-plus--benchmark-method-labels
+  '(("textDocument/didOpen"   . "initial")
+    ("textDocument/didChange" . "incremental"))
+  "Mapping of outgoing LSP method names to benchmark labels.")
 
 (defsubst lsp-ltex-plus--benchmark-enabled-p ()
   "Return non-nil when any latency reporter is active."
   (or lsp-ltex-plus-debug lsp-ltex-plus-show-latency))
 
-(defun lsp-ltex-plus--benchmark-didchange (orig-fn method params)
-  "Record the dispatch time of `textDocument/didChange' to ltex-ls-plus.
-Around-advice for `lsp-notify'.  ORIG-FN, METHOD and PARAMS are forwarded
-unchanged; the advice only observes the call."
-  (when (and (lsp-ltex-plus--benchmark-enabled-p)
-             (equal method "textDocument/didChange")
-             (bound-and-true-p lsp--cur-workspace)
-             (eq 'ltex-ls-plus
-                 (lsp--workspace-server-id lsp--cur-workspace)))
+(defun lsp-ltex-plus--benchmark-outgoing (orig-fn method params)
+  "Record the dispatch time of trigger notifications sent to ltex-ls-plus.
+Around-advice for `lsp-notify'.  METHOD is matched against
+`lsp-ltex-plus--benchmark-method-labels'; unrelated methods are ignored.
+ORIG-FN and PARAMS are forwarded unchanged; the advice only observes the
+call."
+  (when-let* (((lsp-ltex-plus--benchmark-enabled-p))
+              ((bound-and-true-p lsp--cur-workspace))
+              ((eq 'ltex-ls-plus
+                   (lsp--workspace-server-id lsp--cur-workspace)))
+              (label (cdr (assoc method
+                                 lsp-ltex-plus--benchmark-method-labels))))
     (puthash lsp--cur-workspace
-             (cons (current-time) (current-buffer))
-             lsp-ltex-plus--did-change-timestamps))
+             (list (current-time) (current-buffer) label)
+             lsp-ltex-plus--pending-measurements))
   (funcall orig-fn method params))
 
 (defun lsp-ltex-plus--benchmark-diagnostics (workspace &rest _args)
-  "Report didChange→publishDiagnostics latency for ltex-ls-plus.
+  "Report server latency for ltex-ls-plus after diagnostics arrive.
 After-advice for `lsp--on-diagnostics'; WORKSPACE is the workspace that
 just published diagnostics.  Output sinks are controlled by
 `lsp-ltex-plus-debug' (log buffer) and `lsp-ltex-plus-show-latency'
-\(echo area)."
+\(echo area).  The echo-area wording differs for cold-start (didOpen →
+\"initial spell check\") and warm-path (didChange → \"spell check\")
+measurements."
   (when (and (lsp-ltex-plus--benchmark-enabled-p)
              (eq 'ltex-ls-plus (lsp--workspace-server-id workspace)))
-    (when-let* ((entry   (gethash workspace lsp-ltex-plus--did-change-timestamps))
-                (ts      (car entry))
-                (buf     (cdr entry))
-                (elapsed (lsp--ms-since ts)))
+    (when-let* ((entry   (gethash workspace lsp-ltex-plus--pending-measurements))
+                (ts      (nth 0 entry))
+                (buf     (nth 1 entry))
+                (label   (nth 2 entry))
+                (elapsed (lsp--ms-since ts))
+                (phrase  (pcase label
+                           ("initial"     "initial spell check")
+                           ("incremental" "spell check")
+                           (_             "spell check"))))
       (when lsp-ltex-plus-debug
-        (lsp-ltex-plus--log "didChange → publishDiagnostics: %d ms (buffer: %s)"
+        (lsp-ltex-plus--log "%s → publishDiagnostics: %d ms (buffer: %s)"
+                            (if (equal label "initial")
+                                "didOpen"
+                              "didChange")
                             elapsed (buffer-name buf)))
       (when lsp-ltex-plus-show-latency
         (let ((message-log-max nil))
-          (message "Completed spell checking in %d ms." elapsed)))
-      (remhash workspace lsp-ltex-plus--did-change-timestamps))))
+          (message "Completed %s in %d ms." phrase elapsed)))
+      (remhash workspace lsp-ltex-plus--pending-measurements))))
 
 ;;;; -- Lsp-mode Registration --------------------------------------------------
 
@@ -745,7 +782,7 @@ just published diagnostics.  Output sinks are controlled by
   ;; unconditionally; the handlers themselves are gated by
   ;; `lsp-ltex-plus-debug' so there is no runtime cost when debug is off.
   (advice-add 'lsp-notify :around
-              #'lsp-ltex-plus--benchmark-didchange)
+              #'lsp-ltex-plus--benchmark-outgoing)
   (advice-add 'lsp--on-diagnostics :after
               #'lsp-ltex-plus--benchmark-diagnostics)
 
