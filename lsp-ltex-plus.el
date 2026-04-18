@@ -823,12 +823,17 @@ measurements."
   (when lsp-ltex-plus-apply-kind-first-patch
     (lsp-ltex-plus--apply-lsp-mode-patch))
 
-  ;; Filter ltex-ls-plus progress notifications out of the mode line unless
-  ;; the user opts back in via `lsp-ltex-plus-show-progress'.  `advice-add'
-  ;; is idempotent for the same symbol + function pair, so re-runs of this
-  ;; setup do not stack advices.
-  (advice-add 'lsp-on-progress-modeline :around
-              #'lsp-ltex-plus--suppress-progress)
+  ;; Progress-silencing advice — only installed when the user has opted
+  ;; in to hiding ltex-ls-plus progress updates by setting
+  ;; `lsp-ltex-plus-show-progress' to nil.  Flipping the flag mid-session
+  ;; does not install or remove the advice retroactively; re-evaluate the
+  ;; form below (or call `lsp-ltex-plus--setup' again) to change state.
+  ;; The advice body additionally re-checks the flag, so a mid-session
+  ;; toggle back to t already-installed-advice correctly falls through to
+  ;; the original modeline handler.
+  (unless lsp-ltex-plus-show-progress
+    (advice-add 'lsp-on-progress-modeline :around
+                #'lsp-ltex-plus--suppress-progress))
 
   ;; Apply sticky debug defaults.  Must run before the benchmark advice install
   ;; below, because enabling debug mode here implicitly turns on
