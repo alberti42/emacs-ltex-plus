@@ -678,16 +678,48 @@ ORIG-FN for every other WORKSPACE."
 ;; reflects server-side latency; the subsequent flycheck/flymake rendering
 ;; step is not included (see `lsp-ltex-plus-show-latency' docstring).
 ;;
-;; Notes:
-;; - Consecutive edits debounce in `lsp-mode'; we measure from the moment the
-;;   debounced/immediate `lsp-notify' actually fires, i.e. from when the server
-;;   becomes aware of the new buffer state.
-;; - If several trigger notifications fire before any diagnostics arrive, the
-;;   most recent timestamp (and its label) overwrites the previous one.  In
-;;   normal flow this does not happen, because the server answers didOpen well
-;;   before the user starts typing, but in the edge case of "open then type
-;;   immediately" the reported figure is the latency from the *latest*
-;;   notification to its next publishDiagnostics.
+;; When lsp-mode flushes a debounced didChange, we time from that flush — not
+;; from the user's keystroke — so the number reflects "server became aware of
+;; the new state → diagnostics returned", which is what we want to report.
+;;
+;; ---- Correlation model and accuracy ----------------------------------------
+;;
+;; A `publishDiagnostics' notification does not carry a reference to the
+;; trigger it answers: no JSON-RPC `id' (it is a notification, not a
+;; response), and `ltex-ls-plus' does not echo `textDocument.version' in its
+;; params (verified in the wire log).  We therefore cannot match a response
+;; to its originating request.
+;;
+;; Practical solution: we keep a *single* pending-measurement slot per
+;; workspace.  Every outgoing trigger overwrites it; the first
+;; publishDiagnostics that arrives claims whatever is in the slot.  This is the
+;; simplest workable scheme with no correlation ID available, and it is correct
+;; in the common case (one trigger → one response, with nothing else in flight).
+;;
+;; PATHOLOGICAL SITUATIONS: OPTIMISTIC TIMING
+;;
+;;  When more than one trigger fires before the first response returns, we
+;;  measure from the *most recent* trigger, even though the server may still be
+;;  answering an earlier, now-overwritten one.  The reported elapsed is
+;;  therefore always ≤ true latency: we can underestimate but never
+;;  overestimate.  Example timeline:
+;;
+;;        t=0    didChange v2 sent     (slot := T0, label incremental)
+;;        t=50   didChange v3 sent     (slot := T1, overwrite)
+;;        t=100  didChange v4 sent     (slot := T2, overwrite)
+;;        t=180  publishDiagnostics    (elapsed reported: 180-100 = 80 ms)
+;;
+;;    If that diagnostic was really the server's answer to v2 (true latency
+;;    180 ms), the bias is 100 ms downward.  If it was the answer to v4, the
+;;    report is exact.
+;;
+;; In practice, this situation is rare.  `lsp-mode' coalesces rapid edits into
+;; one didChange because of `lsp-debounce-full-sync-notifications-interval'
+;; before flushing, and `ltex-ls-plus' publishes diagnostics for the latest
+;; processed version rather than every intermediate one, so the "most recent
+;; trigger" slot usually is the one the server is actually answering.  In
+;; conclusion: a bias rarely occurs and, when present, is silent and always
+;; optimistic.
 
 (defvar lsp-ltex-plus--pending-measurements (make-hash-table :test 'eq)
   "Per-workspace map of pending latency measurements.
