@@ -495,15 +495,22 @@ Items in vectors are merged and deduplicated using `string=`."
 
 ;;;; -- Action Handlers --------------------------------------------------------
 
+;; Use abstract `lsp-get' / `lsp-map' (from `lsp-protocol.el') rather low-level
+;; than `gethash' / `maphash' directly: lsp-mode represents JSON objects as hash
+;; tables by default but as plists when `lsp-use-plists' is set at byte-compile
+;; time (the default in Doom Emacs).  The `lsp-get' / `lsp-map' helpers pick the
+;; right accessor for the active representation and normalise the key to a
+;; string.
+
 (defun lsp-ltex-plus--action-add-to-dictionary (action)
   "Process the _ltex.addToDictionary ACTION from the server."
   (lsp-ltex-plus--log "Action: addToDictionary")
-  (let* ((args (gethash "arguments" action))
+  (let* ((args (lsp-get action :arguments))
          (arg0 (and (vectorp args) (aref args 0)))
-         (words-by-lang (and arg0 (gethash "words" arg0))))
+         (words-by-lang (and arg0 (lsp-get arg0 :words))))
     (if (null words-by-lang)
         (message "[lsp-ltex-plus] addToDictionary: Malformed arguments %S" args)
-      (maphash (lambda (lang words-arr)
+      (lsp-map (lambda (lang words-arr)
                  (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--dictionary
                                               lsp-ltex-plus-dictionary-file
                                               lang (append words-arr nil)))
@@ -514,12 +521,12 @@ Items in vectors are merged and deduplicated using `string=`."
 (defun lsp-ltex-plus--action-disable-rules (action)
   "Process the _ltex.disableRules ACTION."
   (lsp-ltex-plus--log "Action: disableRules")
-  (let* ((args (gethash "arguments" action))
+  (let* ((args (lsp-get action :arguments))
          (arg0 (and (vectorp args) (aref args 0)))
-         (rules-by-lang (and arg0 (gethash "ruleIds" arg0))))
+         (rules-by-lang (and arg0 (lsp-get arg0 :ruleIds))))
     (if (null rules-by-lang)
         (message "[lsp-ltex-plus] disableRules: Malformed arguments %S" args)
-      (maphash (lambda (lang rules-arr)
+      (lsp-map (lambda (lang rules-arr)
                  (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus-disabled-rules
                                               lsp-ltex-plus-disabled-rules-file
                                               lang (append rules-arr nil)))
@@ -529,12 +536,12 @@ Items in vectors are merged and deduplicated using `string=`."
 (defun lsp-ltex-plus--action-hide-false-positives (action)
   "Process the _ltex.hideFalsePositives ACTION."
   (lsp-ltex-plus--log "Action: hideFalsePositives")
-  (let* ((args (gethash "arguments" action))
+  (let* ((args (lsp-get action :arguments))
          (arg0 (and (vectorp args) (aref args 0)))
-         (fps-by-lang (and arg0 (gethash "falsePositives" arg0))))
+         (fps-by-lang (and arg0 (lsp-get arg0 :falsePositives))))
     (if (null fps-by-lang)
         (message "[lsp-ltex-plus] hideFalsePositives: Malformed arguments %S" args)
-      (maphash (lambda (lang fps-arr)
+      (lsp-map (lambda (lang fps-arr)
                  (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--hidden-false-positives
                                               lsp-ltex-plus-hidden-false-positives-file
                                               lang (append fps-arr nil)))
@@ -960,8 +967,8 @@ measurements."
                                                                :trace (:server ,lsp-ltex-plus-trace-server))))))
     :action-handlers
     (lsp-ht ("_ltex.addToDictionary"     #'lsp-ltex-plus--action-add-to-dictionary)
-            ("_ltex.disableRules"       #'lsp-ltex-plus--action-disable-rules)
-            ("_ltex.hideFalsePositives" #'lsp-ltex-plus--action-hide-false-positives))))
+            ("_ltex.disableRules"        #'lsp-ltex-plus--action-disable-rules)
+            ("_ltex.hideFalsePositives"  #'lsp-ltex-plus--action-hide-false-positives))))
   (lsp-ltex-plus--log "lsp-ltex-plus--setup completed."))
 
 ;;;; -- Activation -------------------------------------------------------------
