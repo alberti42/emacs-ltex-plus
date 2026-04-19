@@ -2,7 +2,7 @@
 
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((emacs "27.1") (lsp-mode "6.0"))
 ;; Keywords: lsp, grammar, spelling, convenience
 ;; URL: https://github.com/alberti42/emacs-ltex-plus

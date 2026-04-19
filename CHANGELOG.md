@@ -1,5 +1,10 @@
 # Change Log
 
+## [0.2.1] - 2026-04-19
+
+### Fixed
+- Code action handlers (`_ltex.addToDictionary`, `_ltex.disableRules`, `_ltex.hideFalsePositives`) errored with `Wrong type argument: hash-table-p` when `lsp-use-plists` was enabled (e.g. on Doom Emacs). Replaced direct `gethash`/`maphash` calls with abstract `lsp-get` / `lsp-map` from `lsp-protocol.el`, which pick the right accessor for whichever representation `lsp-mode` was compiled against. Reported on Reddit by TremulousTones.
+
 ## [0.2.0] - 2026-04-18
 
 ### Added
