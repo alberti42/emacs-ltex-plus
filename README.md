@@ -368,6 +368,36 @@ If Emacs cannot find the `ltex-ls-plus` binary, ensure it is in your system `PAT
 
 If it returns `nil`, you must either add the binary's directory to your `PATH` or provide the absolute path to the executable via `lsp-ltex-plus-ls-plus-executable`. See [Server Installation](#4-make-it-discoverable) for details.
 
+### Language Not Recognized
+
+**Symptom:** No diagnostics ever appear for a buffer that should be checked. The server's stderr buffer (`*ltex-ls-plus::stderr*`) contains a line of the form:
+
+```
+'fr-FR' is not a recognized language. Leaving LanguageTool uninitialized, checking disabled.
+```
+
+The server process stays up, but grammar checking is disabled for that language until the setting is fixed and the server is restarted.
+
+**Cause:** The local server accepts only the exact codes listed on the [LTeX+ supported languages page](https://ltex-plus.github.io/ltex-plus/supported-languages.html), and several languages have no regional variants there. For example:
+
+- French is only `"fr"` — `"fr-FR"` is **not** accepted.
+- Italian is only `"it"`, Spanish only `"es"` (plus `"es-AR"`), Dutch only `"nl"` (plus `"nl-BE"`).
+- German has `"de"`, `"de-AT"`, `"de-CH"`, `"de-DE"`.
+- English has `"en"`, `"en-AU"`, `"en-CA"`, `"en-GB"`, `"en-NZ"`, `"en-US"`, `"en-ZA"`.
+- Portuguese has `"pt"`, `"pt-AO"`, `"pt-BR"`, `"pt-MZ"`, `"pt-PT"`.
+
+The **remote LanguageTool server** (when `lsp-ltex-plus-lt-server-uri` points at `https://api.languagetoolplus.com`) is more permissive and accepts codes such as `"fr-FR"` that the local server rejects. A configuration that works against the remote service can therefore stop working after a switch to the local backend — with only the stderr line above to signal what happened.
+
+**A second subtlety — bare code vs. regional variant.** Where a language is listed **both** with a bare code and one or more regional variants (English, German, Portuguese, Dutch, Catalan), the bare code (`en`, `de`, `pt`, `nl`, `ca-ES`) enables LanguageTool's grammar rules but **no spell-check dictionary** — dictionaries are variant-specific. Pick the variant matching your text (`en-US`, `de-DE`, `pt-BR`, …) to get both grammar *and* spelling. For languages listed only as a bare code (French `"fr"`, Italian `"it"`, Swedish `"sv"`, …), that code already includes the single dictionary LanguageTool ships for that language — there is nothing more specific to choose.
+
+**Fix:** Check `lsp-ltex-plus-language` against the official list and pick a code that appears there verbatim:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-language "fr"))  ; NOT "fr-FR" — French has no regional variants
+```
+
 ### Communication Stalls — No More Diagnostics
 
 **Symptom:** After a few edits, grammar diagnostics stop updating entirely. The `*lsp-log*` buffer shows no new activity, and the server appears alive but silent.
