@@ -145,16 +145,14 @@ is_current_unknown_word_rule() {
   esac
 }
 
-# Simulates the proposed extension: current set + any QB_NEW_* rule whose
-# ID contains ORTHOGRAPHY or SPELLING.
+# Simulates the extended predicate shipped on the fix/isUnknownWordRule
+# branch of ltex-ls-plus: current set + any rule ID containing ORTHOGRAPHY
+# (catches QB_NEW_*_ORTHOGRAPHY_* and AI_*_ORTHOGRAPHY_*) or _SIMPLE_REPLACE_
+# (catches ES_SIMPLE_REPLACE_* and siblings).
 is_proposed_unknown_word_rule() {
   is_current_unknown_word_rule "$1" && return 0
   case "$1" in
-    QB_NEW_*)
-      case "$1" in
-        *ORTHOGRAPHY*|*SPELLING*) return 0 ;;
-      esac
-      ;;
+    *ORTHOGRAPHY*|*_SIMPLE_REPLACE_*) return 0 ;;
   esac
   return 1
 }
