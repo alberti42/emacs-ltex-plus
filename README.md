@@ -300,9 +300,9 @@ Deactivation is properly scoped: when the mode is turned off in a buffer where o
 
 ## Customization
 
-`lsp-ltex-plus` supports the full range of customizable parameters provided by the LTeX+ server, alongside unique settings specific to this Emacs client (such as debugging tools). For detailed documentation on the official LTeX+ server settings, visit the [official settings page](https://ltex-plus.github.io/ltex-plus/settings.html).
+`lsp-ltex-plus` supports the full range of customizable parameters provided by the LTeX+ server, alongside unique settings specific to this Emacs client (such as debugging tools). For detailed documentation on the official LTeX+ server settings, visit the [official settings page](https://ltex-plus.github.io/ltex-plus/settings.html). LTeX+ itself is a thin LSP wrapper around the [LanguageTool Java library](https://github.com/languagetool-org/languagetool) (`languagetool-core` + per-language modules), adding document parsers (LaTeX, Markdown, BibTeX, …) and per-language client-scoped settings on top of LT's rule engine.
 
-You can configure these using `:custom` in `use-package`:
+You can configure the parameters using `:custom` in `use-package`:
 
 ```elisp
 (use-package lsp-ltex-plus
@@ -317,38 +317,43 @@ You can configure these using `:custom` in `use-package`:
 
 ### Full list of supported parameters
 
-| Parameter | Description | Official LTeX+ Setting |
-| :--- | :--- | :---: |
-| `lsp-ltex-plus-ls-plus-executable` | The name or path of the ltex-ls-plus executable. | |
-| `lsp-ltex-plus-debug` | When non-nil, enable verbose logging and JSON-RPC tracing. | |
-| `lsp-ltex-plus-major-modes` | Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation. | |
-| `lsp-ltex-plus-check-programming-languages` | When non-nil, enable grammar checking in comments of programming languages (disabled by default, matching LTeX+). | |
-| `lsp-ltex-plus-language` | The language (e.g., "en-US") LanguageTool should check against. | X |
-| `lsp-ltex-plus-enabled-rules` | Lists of rules that should be enabled (language-specific). | X |
-| `lsp-ltex-plus-disabled-rules` | Lists of rules that should be disabled (language-specific). | X |
-| `lsp-ltex-plus-bibtex-fields` | List of BibTeX fields whose values are to be checked. | X |
-| `lsp-ltex-plus-latex-commands` | List of LaTeX commands to be handled by the LaTeX parser. | X |
-| `lsp-ltex-plus-latex-environments` | List of LaTeX environments to be handled by the LaTeX parser. | X |
-| `lsp-ltex-plus-markdown-nodes` | List of Markdown node types to be handled by the Markdown parser. | X |
-| `lsp-ltex-plus-additional-rules-enable-picky-rules` | Enable LanguageTool rules that are marked as picky. | X |
-| `lsp-ltex-plus-additional-rules-mother-tongue` | Optional mother tongue of the user (e.g., "de-DE"). | X |
-| `lsp-ltex-plus-additional-rules-language-model` | Optional path to a directory with n-gram language models. | X |
-| `lsp-ltex-plus-lt-server-uri` | Base URI for the LanguageTool HTTP server (set to nil for local-only). | X |
-| `lsp-ltex-plus-lt-username` | Username for LanguageTool Premium API access. | X |
-| `lsp-ltex-plus-lt-api-key` | API key for LanguageTool Premium API access. | X |
-| `lsp-ltex-plus-ltex-ls-path` | Path to the root directory of ltex-ls-plus. | X |
-| `lsp-ltex-plus-ltex-ls-log-level` | Logging level of the ltex-ls-plus server log. | X |
-| `lsp-ltex-plus-java-path` | Path to an existing Java installation (JAVA_HOME). | X |
-| `lsp-ltex-plus-java-initial-heap` | Initial size of the Java heap memory (MB). | X |
-| `lsp-ltex-plus-java-max-heap` | Maximum size of the Java heap memory (MB). | X |
-| `lsp-ltex-plus-sentence-cache-size` | Size of the LanguageTool ResultCache in sentences. | X |
-| `lsp-ltex-plus-completion-enabled` | Controls whether completion is enabled (IntelliSense). | X |
-| `lsp-ltex-plus-diagnostic-severity` | Severity of the diagnostics (error, warning, information, hint). | X |
-| `lsp-ltex-plus-check-frequency` | Controls when documents should be checked (edit, save, manual). | X |
-| `lsp-ltex-plus-clear-diagnostics-when-closing-file` | Whether to clear diagnostics when a file is closed. | X |
-| `lsp-ltex-plus-show-progress` | When non-nil (default), show `ltex-ls-plus` progress updates in the mode line (the `⌛` prefix and optional spinner). Set to nil to silence the flicker on every keystroke without affecting progress rendering for other LSP clients. **Read at startup only** — see the note below the table. | || `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | |
-| `lsp-ltex-plus-show-latency` | When non-nil, echo the server round-trip time after every check. Reports both the cold start (`"Completed initial spell check in N ms."` after `textDocument/didOpen`) and the warm path (`"Completed spell check in N ms."` after each `textDocument/didChange`). Off by default; see [Measuring Server Latency](#measuring-server-latency). **Read at startup only** — see the note below the table. | |
-| `lsp-ltex-plus-multi-root` | When non-nil (default), register the client as multi-root so a single `ltex-ls-plus` JVM handles all folders in the session. Leave enabled unless you have a specific need to isolate projects — disabling it spawns one JVM per project root, which can balloon memory usage. | |
+The table below lists every parameter this Emacs client exposes. Crosses denote parameters for which a counterpart exists in LTeX+ (column 3) and in the underlying LanguageTool itself (column 4) — either the [`/check` HTTP parameter](https://languagetoolplus.com/http-api/) or the equivalent concept in the [Java library](https://github.com/languagetool-org/languagetool).
+
+An empty space means the parameter has no direct counterpart at that layer: typically an Emacs-only concern (e.g., UI behaviour, mode registration) or an LTeX+-only feature (e.g., user custom dictionaries for individual languages).
+
+| Parameter | Description | Official LTeX+ Setting | Counterpart in LT |
+| :--- | :--- | :---: | :---: |
+| `lsp-ltex-plus-ls-plus-executable` | The name or path of the ltex-ls-plus executable. | | |
+| `lsp-ltex-plus-debug` | When non-nil, enable verbose logging and JSON-RPC tracing. | | |
+| `lsp-ltex-plus-major-modes` | Alist of (major-mode . language-id) pairs for lsp-ltex-plus activation. | | |
+| `lsp-ltex-plus-check-programming-languages` | When non-nil, enable grammar checking in comments of programming languages (disabled by default, matching LTeX+). | | |
+| `lsp-ltex-plus-language` | The language (e.g., "en-US") LanguageTool should check against. | X | X |
+| `lsp-ltex-plus-enabled-rules` | Lists of rules that should be enabled (language-specific). | X | X |
+| `lsp-ltex-plus-disabled-rules` | Lists of rules that should be disabled (language-specific). | X | X |
+| `lsp-ltex-plus-bibtex-fields` | List of BibTeX fields whose values are to be checked. | X | |
+| `lsp-ltex-plus-latex-commands` | List of LaTeX commands to be handled by the LaTeX parser. | X | |
+| `lsp-ltex-plus-latex-environments` | List of LaTeX environments to be handled by the LaTeX parser. | X | |
+| `lsp-ltex-plus-markdown-nodes` | List of Markdown node types to be handled by the Markdown parser. | X | |
+| `lsp-ltex-plus-additional-rules-enable-picky-rules` | Enable LanguageTool rules that are marked as picky. | X | X |
+| `lsp-ltex-plus-additional-rules-mother-tongue` | Optional mother tongue of the user (e.g., "de-DE"). | X | X |
+| `lsp-ltex-plus-additional-rules-language-model` | Optional path to a directory with n-gram language models. | X | X |
+| `lsp-ltex-plus-lt-server-uri` | Base URI for the LanguageTool HTTP server (set to nil for local-only). | X | |
+| `lsp-ltex-plus-lt-username` | Username for LanguageTool Premium API access. | X | X |
+| `lsp-ltex-plus-lt-api-key` | API key for LanguageTool Premium API access. | X | X |
+| `lsp-ltex-plus-ltex-ls-path` | Path to the root directory of ltex-ls-plus. | X | |
+| `lsp-ltex-plus-ltex-ls-log-level` | Logging level of the ltex-ls-plus server log. | X | |
+| `lsp-ltex-plus-java-path` | Path to an existing Java installation (JAVA_HOME). | X | |
+| `lsp-ltex-plus-java-initial-heap` | Initial size of the Java heap memory (MB). | X | |
+| `lsp-ltex-plus-java-max-heap` | Maximum size of the Java heap memory (MB). | X | |
+| `lsp-ltex-plus-sentence-cache-size` | Size of the LanguageTool ResultCache in sentences. | X | X |
+| `lsp-ltex-plus-completion-enabled` | Controls whether completion is enabled (IntelliSense). | X | |
+| `lsp-ltex-plus-diagnostic-severity` | Severity of the diagnostics (error, warning, information, hint). | X | |
+| `lsp-ltex-plus-check-frequency` | Controls when documents should be checked (edit, save, manual). | X | |
+| `lsp-ltex-plus-clear-diagnostics-when-closing-file` | Whether to clear diagnostics when a file is closed. | X | |
+| `lsp-ltex-plus-show-progress` | When non-nil (default), show `ltex-ls-plus` progress updates in the mode line (the `⌛` prefix and optional spinner). Set to nil to silence the flicker on every keystroke without affecting progress rendering for other LSP clients. **Read at startup only** see the note below the table. | | |
+| `lsp-ltex-plus-apply-kind-first-patch` | Whether to apply the 'Kind-First' routing patch to lsp-mode. | | |
+| `lsp-ltex-plus-show-latency` | When non-nil, echo the server round-trip time after every check. Reports both the cold start (`"Completed initial spell check in N ms."` after `textDocument/didOpen`) and the warm path (`"Completed spell check in N ms."` after each `textDocument/didChange`). Off by default; see [Measuring Server Latency](#measuring-server-latency). **Read at startup only** see the note below the table. | | |
+| `lsp-ltex-plus-multi-root` | When non-nil (default), register the client as multi-root so a single `ltex-ls-plus` JVM handles all folders in the session. Leave enabled unless you have a specific need to isolate projects disabling it spawns one JVM per project root, which can balloon memory usage. | | |
 
 > **Note — startup-only settings.** `lsp-ltex-plus-show-progress` and `lsp-ltex-plus-show-latency` are read once when `lsp-ltex-plus` initialises (the first time a supported buffer is opened in the Emacs session). Each one controls an `advice-add` that is installed at that moment only if the flag has the appropriate value; changing the flag afterwards with `setq` or `customize-set-variable` does not install or remove the advice retroactively. To make a mid-session change take effect, restart Emacs or call `M-: (lsp-ltex-plus--setup)` to re-run the client setup.
 
