@@ -205,20 +205,6 @@ All three keywords can be combined. `:extend-to` entries are always added after 
   :extend-to   '((my-custom-mode "plaintext" nil)))
 ```
 
-If none of the keyword arguments are sufficient and you need to replace the list entirely, set `lsp-ltex-plus-major-modes` directly **before** the `use-package` block (it is a plain `defvar`, not a `defcustom`):
-
-```elisp
-(setq lsp-ltex-plus-major-modes
-      '((markdown-mode "markdown" nil)
-        (org-mode      "org"      nil)
-        (text-mode     "plaintext" nil)))
-
-(use-package lsp-ltex-plus
-  :defer t
-  :init
-  (lsp-ltex-plus-enable-for-modes))
-```
-
 ### Ready-to-go Configuration Example
 
 For a more robust setup using `use-package` and `straight.el`, you can use the following pattern. This example shows how to automatically pull credentials from your system environment variables if you choose to use an online service:
@@ -361,7 +347,7 @@ An empty space means the parameter has no direct counterpart at that layer: typi
 > - **R** — *Requires server restart*: the server reads the value at JVM init only. Change the variable, then run `M-x lsp-workspace-restart` for it to take effect.
 > - **S** — *Setup-only*: wired during `lsp-ltex-plus--setup` (the first time a supported buffer is opened in the Emacs session). Typically installed via `advice-add` or baked into the `lsp-register-client` call. Changing the variable later with `setq` or `customize-set-variable` does not re-apply the change. To force a mid-session update, restart Emacs or evaluate `M-: (lsp-ltex-plus--setup)`.
 >
-> **†** on `lsp-ltex-plus-major-modes` — the dispatcher's effective mode set is snapshotted into `lsp-ltex-plus--enabled-modes` at the `lsp-ltex-plus-enable-for-modes` call, so adding entries afterwards does not cause new modes to auto-activate without re-running that function. The `:language-id` lookup, however, reads the registry live, so editing an existing entry's language-id is honoured on the next buffer activation.
+> **†** on `lsp-ltex-plus-major-modes` — this is a registry, not a customization knob. It is listed here for reference because the client reads from it, but users should not mutate it directly. To adjust which modes the dispatcher activates on, call `lsp-ltex-plus-enable-for-modes` with its `:restrict-to`, `:exclude`, and `:extend-to` keyword arguments (see [Customizing Supported Modes](#customizing-supported-modes)).
 >
 > **†** on `lsp-ltex-plus-check-programming-languages` — re-read at every buffer (re-)activation rather than on every check. Already-active buffers are unaffected by a mid-session flip; newly opened or toggled buffers see the new value.
 
