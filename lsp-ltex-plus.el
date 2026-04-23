@@ -1061,9 +1061,9 @@ measurements."
     ;; "hijack" primary LSP features (Go to Definition, Completion, etc.).
     :add-on? t
     :priority -1
-    ;; `:multi-root' reads the defcustom at registration time.  The fallback
-    ;; path inside `:initialized-fn' re-registers the client with the flag
-    ;; cleared if the server does not advertise workspace folders support.
+    ;; `:multi-root' is latched at registration time (when this
+    ;; `lsp-register-client' call fires).  Changing `lsp-ltex-plus-multi-root'
+    ;; after that has no effect until Emacs restarts.
     :multi-root lsp-ltex-plus-multi-root
     :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
