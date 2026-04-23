@@ -318,10 +318,10 @@ An empty space means the parameter has no direct counterpart at that layer: typi
 | `lsp-ltex-plus-major-modes` | S† | List of `(major-mode language-id programming-p)` triples driving client activation. *Type:* list; *default:* ~80 entries covering markup and programming modes (defined in `lsp-ltex-plus-bootstrap.el`). | | |
 | `lsp-ltex-plus-check-programming-languages` | L† | When non-nil, enable grammar checking in comments of programming languages (disabled by default, matching LTeX+). *Type:* boolean; *default:* `nil`. | | |
 | `lsp-ltex-plus-language` | L | The language LanguageTool should check against (e.g. `"en-US"`, `"de-DE"`). Valid codes are listed on the [LTeX+ supported-languages page](https://ltex-plus.github.io/ltex-plus/supported-languages.html); `"auto"` attempts language detection (not recommended — no spelling). *Type:* string; *default:* `"en-US"`. | X | X |
-| `lsp-ltex-plus-dictionary` | L | Additional words accepted as correctly spelled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of word strings; *default:* `nil`. Merged with the on-disk `stored-dictionary` file (also grown at runtime by the *Add to dictionary* code action); for large word lists prefer the file — see [External settings](#external-settings). | X | |
-| `lsp-ltex-plus-enabled-rules` | L | Lists of rules that should be enabled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of rule-ID strings; *default:* `nil`. Merged with the on-disk `enabled-rules` file — see [External settings](#external-settings). | X | X |
-| `lsp-ltex-plus-disabled-rules` | L | Lists of rules that should be disabled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of rule-ID strings; *default:* `nil`. Merged with the on-disk `disabled-rules` file (also grown at runtime by the *Disable rule* code action). | X | X |
-| `lsp-ltex-plus-hidden-false-positives` | L | Language-specific patterns that suppress false-positive diagnostics client-side-of-the-checker. *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of JSON strings of the form `{"rule":"RULE_ID","sentence":"REGEX"}`; *default:* `nil`. Merged with the on-disk `hidden-false-positives` file (also grown at runtime by the *Hide false positive* code action). | X | |
+| `lsp-ltex-plus-dictionary` | L | Additional words accepted as correctly spelled (language-specific). *Type:* plist; *default:* `nil`. See [External settings](#external-settings) for format and behaviour. | X | |
+| `lsp-ltex-plus-enabled-rules` | L | Language-specific list of rules to enable. *Type:* plist; *default:* `nil`. See [External settings](#external-settings). | X | X |
+| `lsp-ltex-plus-disabled-rules` | L | Language-specific list of rules to disable. *Type:* plist; *default:* `nil`. See [External settings](#external-settings). | X | X |
+| `lsp-ltex-plus-hidden-false-positives` | L | Regex-based suppression of false-positive diagnostics (language-specific). *Type:* plist; *default:* `nil`. See [External settings](#external-settings). | X | |
 | `lsp-ltex-plus-bibtex-fields` | L | BibTeX fields whose values are to be checked. *Type:* alist of `(field-name . boolean)`; *default:* `nil`. | X | |
 | `lsp-ltex-plus-latex-commands` | L | LaTeX commands to be handled by the LaTeX parser (listed with empty arguments, e.g. `"\ref{}"`). *Type:* alist of `(command . action)`, where action is `"default"`, `"ignore"`, `"dummy"`, `"pluralDummy"`, or `"vowelDummy"`; *default:* `nil`. | X | |
 | `lsp-ltex-plus-latex-environments` | L | LaTeX environments to be handled by the LaTeX parser. *Type:* alist of `(env-name . action)`, where action is `"default"` or `"ignore"`; *default:* `nil`. | X | |
@@ -374,9 +374,39 @@ Code actions update the relevant file and notify the server, so the change takes
 | `disabled-rules` | `lsp-ltex-plus-disabled-rules` | yes | LanguageTool |
 | `hidden-false-positives` | `lsp-ltex-plus-hidden-false-positives` | yes | **LTeX+ only** |
 
+#### Format
+
+All four settings use the same structure: an Emacs **plist** (property list) whose keys are language-code keywords (`:en-US`, `:de-DE`, `:fr`, `:it`, …) and whose values are vectors of strings. Languages you never touch don't need to be present; unknown keys are ignored by the server.
+
+A minimal example seeding a couple of disabled rules for two languages via `:custom`:
+
+```elisp
+(use-package lsp-ltex-plus
+  :custom
+  (lsp-ltex-plus-disabled-rules
+   '(:en-US ["UPPERCASE_SENTENCE_START" "EN_QUOTES"]
+     :de-DE ["TYPOGRAFISCHE_ANFUEHRUNGSZEICHEN"])))
+```
+
+The meaning of each string is setting-specific:
+
+| Setting | Each string is… |
+| :--- | :--- |
+| `dictionary` | a single word, e.g. `"alberti"` |
+| `enabled-rules` / `disabled-rules` | a LanguageTool rule ID, e.g. `"EN_QUOTES"` |
+| `hidden-false-positives` | a JSON object of the form `{"rule":"RULE_ID","sentence":"REGEX"}`, e.g. `"{\"rule\":\"MORFOLOGIK_RULE_EN_US\",\"sentence\":\"^My LaTeX\\\\TeX command\\\\.$\"}"` |
+
+The on-disk files use the same Lisp representation — open `~/.emacs.d/lsp-ltex-plus/stored-dictionary` (or any of the others) in Emacs and you'll see a plain plist like:
+
+```elisp
+(:en-US ["Alberti" "elisp" "plist"] :it ["Caravaggio"])
+```
+
+Hand-editing the file is supported; afterwards run `M-x lsp-ltex-plus-reload-external-settings` (see [Inspecting and editing](#inspecting-and-editing)) or restart Emacs to pick up the change.
+
 #### What each one is for
 
-**Dictionary** — a per-language list of additional words that should be accepted as correctly spelled. Grown at runtime by the *Add to dictionary* code action, and seedable from `:custom`. For large hand-curated word lists, prefer editing the on-disk file directly (see [Inspecting and editing](#inspecting-and-editing) below) rather than stuffing everything into `:custom`.
+**Dictionary** — a per-language list of additional words that should be accepted as correctly spelled. Grown at runtime by the *Add to dictionary* code action, and `"seedable" from `:custom`. For large hand-curated word lists, prefer editing the on-disk file directly (see [Inspecting and editing](#inspecting-and-editing) below) rather than stuffing everything into `:custom`.
 
 The dictionary is an **LTeX+ feature**, not a LanguageTool one. The `/check` HTTP endpoint exposed by LanguageTool has no `dictionary` parameter, and the personal-dictionary APIs offered to LanguageTool Premium subscribers live on a separate set of endpoints that `ltex-ls-plus` does not use. Instead, LTeX+ applies the dictionary locally. This means the following: For LanguageTool's rules pertaining to orthography errors (`MORFOLOGIK_RULE_*`, `HUNSPELL_*` and, for LT premium users, `*ORTHOGRAPHY*`), LTeX+ checks whether the listed words occur in the user's dictionary, and if so, it prevents the resulting diagnostics from being sent on to Emacs. This works identically for both the embedded local LanguageTool and the remote `lsp-ltex-plus-lt-server-uri`, since the dictionary filter runs in the LTeX+ server `ltex-ls-plus` either way.
 
