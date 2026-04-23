@@ -2,6 +2,7 @@
 
 <!-- ltex: language=en-GB -->
 <!-- ltex: dictionary+=plist -->
+<!-- ltex: dictionary+=defcustom -->
 <!-- ltex: dictionary+=LTeX+ -->
 
 `lsp-ltex-plus` is a lightweight [lsp-mode](https://github.com/emacs-lsp/lsp-mode) client for **LTeX+**, a powerful grammar and spell checker powered by [LanguageTool](https://languagetool.org/).
@@ -426,6 +427,17 @@ The dictionary is an **LTeX+ feature**, not a LanguageTool one. The `/check` HTT
 - `M-x lsp-ltex-plus-list-dictionary` — prints the merged dictionary currently in effect (the union of `:custom` and file contents) to the echo area.
 - `M-x lsp-ltex-plus-reload-external-settings` — re-reads all four files, rebuilds the merged views combining them with your `:custom` values, and notifies every running `ltex-ls-plus` workspace so the change takes effect on the next check. Convenient for bulk edits: open any of the four files under `~/.emacs.d/lsp-ltex-plus/` in a buffer, edit entries across one or more languages, save, then run this command.
 - The four files are plain Emacs plists. After hand-editing, either run the reload command above or restart Emacs to pick up the change.
+
+#### Pro tip: per-file overrides with magic comments
+
+For tweaks that only make sense in a single document, LTeX+ supports **magic comments** — file-local directives that override settings for the rest of the file. Two of them map directly onto the external settings above:
+
+- **Rules:** `rules+=RULE_ID` enables a rule for this file, `rules-=RULE_ID` disables it, and `rules#=RULE_ID` reverts the rule to the global setting.
+- **Dictionary:** `dictionary+=Word` accepts a word for this file, `dictionary-=Word` removes one that the global dictionary would accept.
+
+The comment syntax depends on the file's language — e.g. `% LTeX: rules-=EN_QUOTES` in LaTeX, `<!-- LTeX: rules-=EN_QUOTES -->` in Markdown, `# LTeX: rules-=EN_QUOTES` in Org-mode. See the [LTeX+ magic-comments documentation](https://ltex-plus.github.io/ltex-plus/advanced-usage.html#magic-comments) for the full syntax table and the other settings they can change (language, picky rules, LaTeX/Markdown parser tweaks, …).
+
+**No per-file support for hidden false positives.** Magic comments cover rules and the dictionary, but not `hiddenFalsePositives` — if you need file-local false-positive suppression, there is no upstream mechanism for it. Use `:custom` or the `hidden-false-positives` file for a global suppression, or disable the offending rule for the file instead.
 
 ## Troubleshooting
 
