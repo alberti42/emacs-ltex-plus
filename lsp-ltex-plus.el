@@ -198,7 +198,7 @@ This setting is language-specific, so use a plist of the form
 the language code and the value is a vector of words.
 
 Provides the user-seeded counterpart to entries added at runtime via the
-`_ltex.addToDictionary' code action; the two sources are kept separate
+_ltex.addToDictionary code action; the two sources are kept separate
 and merged on the fly for the server.  For large, hand-curated word
 lists, prefer editing the on-disk file (see the External settings
 section in the README) rather than stuffing everything into this
@@ -231,7 +231,7 @@ each string is a JSON object of the form
 rule ID and surrounding sentence regex.
 
 Provides the user-seeded counterpart to entries added at runtime via the
-`_ltex.hideFalsePositives' code action; the two sources are kept
+_ltex.hideFalsePositives code action; the two sources are kept
 separate and merged on the fly for the server.  See the LTeX+
 documentation for the feature:
 https://ltex-plus.github.io/ltex-plus/advanced-usage.html#hiding-false-positives-with-regular-expressions"
@@ -403,7 +403,7 @@ Note: This is a global surgical patch affecting all LSP servers."
 (defvar lsp-ltex-plus--dictionary-stored nil
   "Dictionary plist loaded from on-disk file.
 File location: `lsp-ltex-plus-dictionary-file'.  Mutated by the
-`_ltex.addToDictionary' code action and persisted back to the file.
+_ltex.addToDictionary code action and persisted back to the file.
 Merged with the pristine defcustom `lsp-ltex-plus-dictionary' into
 `lsp-ltex-plus--dictionary-merged' for the server.")
 
@@ -417,14 +417,14 @@ via `lsp-ltex-plus--enabled-rules-merged'.")
 (defvar lsp-ltex-plus--disabled-rules-stored nil
   "Disabled-rules plist loaded from on-disk file.
 File location: `lsp-ltex-plus-disabled-rules-file'.  Mutated by the
-`_ltex.disableRules' code action and persisted back to the file.  Merged
+_ltex.disableRules code action and persisted back to the file.  Merged
 with the pristine defcustom `lsp-ltex-plus-disabled-rules' into
 `lsp-ltex-plus--disabled-rules-merged' for the server.")
 
 (defvar lsp-ltex-plus--hidden-false-positives-stored nil
   "Hidden-false-positives plist loaded from on-disk file.
 File location: `lsp-ltex-plus-hidden-false-positives-file'.  Mutated by
-the `_ltex.hideFalsePositives' code action and persisted back.  Merged
+the _ltex.hideFalsePositives code action and persisted back.  Merged
 with the pristine defcustom `lsp-ltex-plus-hidden-false-positives' into
 `lsp-ltex-plus--hidden-false-positives-merged' for the server.")
 
