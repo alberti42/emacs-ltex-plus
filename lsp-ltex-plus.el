@@ -191,6 +191,21 @@ the document.  This is not recommended, as only generic languages like \"en\" or
   :type 'string
   :group 'lsp-ltex-plus)
 
+(defcustom lsp-ltex-plus-dictionary nil
+  "Additional words accepted as correctly spelled, per language.
+This setting is language-specific, so use a plist of the form
+\\='(:en-US [\"WORD1\" \"WORD2\"] :de-DE [\"WORD1\" ...]) where the key is
+the language code and the value is a vector of words.
+
+Provides the user-seeded counterpart to entries added at runtime via the
+`_ltex.addToDictionary' code action; the two sources are kept separate
+and merged on the fly for the server.  For large, hand-curated word
+lists, prefer editing the on-disk file (see the External settings
+section in the README) rather than stuffing everything into this
+variable."
+  :type 'plist
+  :group 'lsp-ltex-plus)
+
 (defcustom lsp-ltex-plus-enabled-rules nil
   "Lists of rules that should be enabled (if disabled by default).
 This setting is language-specific, so use an object of the format
@@ -204,6 +219,22 @@ the language code and the value is a vector of rule IDs."
 This setting is language-specific, so use an object of the format
 \\='(:en-US [\"RULE1\" \"RULE2\"] :de-DE [\"RULE1\" ...]) where the key is
 the language code and the value is a vector of rule IDs."
+  :type 'plist
+  :group 'lsp-ltex-plus)
+
+(defcustom lsp-ltex-plus-hidden-false-positives nil
+  "False-positive diagnostics that should be hidden from reports.
+This setting is language-specific, so use a plist of the form
+\\='(:en-US [\"<jsonObject1>\" ...] :de-DE [\"<jsonObject1>\" ...]) where
+each string is a JSON object of the form
+`{\"rule\":\"RULE_ID\",\"sentence\":\"REGEX\"}' that matches a diagnostic's
+rule ID and surrounding sentence regex.
+
+Provides the user-seeded counterpart to entries added at runtime via the
+`_ltex.hideFalsePositives' code action; the two sources are kept
+separate and merged on the fly for the server.  See the LTeX+
+documentation for the feature:
+https://ltex-plus.github.io/ltex-plus/advanced-usage.html#hiding-false-positives-with-regular-expressions"
   :type 'plist
   :group 'lsp-ltex-plus)
 
@@ -369,11 +400,60 @@ Note: This is a global surgical patch affecting all LSP servers."
 (defvar lsp-ltex-plus--start-time nil
   "Timestamp of when `lsp-ltex-plus--setup' was executed.")
 
-(defvar lsp-ltex-plus--dictionary nil
-  "In-memory plist of additional dictionary words.")
+(defvar lsp-ltex-plus--dictionary-stored nil
+  "Dictionary plist loaded from on-disk file.
+File location: `lsp-ltex-plus-dictionary-file'.  Mutated by the
+`_ltex.addToDictionary' code action and persisted back to the file.
+Merged with the pristine defcustom `lsp-ltex-plus-dictionary' into
+`lsp-ltex-plus--dictionary-merged' for the server.")
 
-(defvar lsp-ltex-plus--hidden-false-positives nil
-  "List of false-positive diagnostics to hide.")
+(defvar lsp-ltex-plus--enabled-rules-stored nil
+  "Enabled-rules plist loaded from on-disk file.
+File location: `lsp-ltex-plus-enabled-rules-file'.  Kept separate from
+the user-facing defcustom `lsp-ltex-plus-enabled-rules' so `:custom'
+values never get written to disk; the server sees the merge of the two
+via `lsp-ltex-plus--enabled-rules-merged'.")
+
+(defvar lsp-ltex-plus--disabled-rules-stored nil
+  "Disabled-rules plist loaded from on-disk file.
+File location: `lsp-ltex-plus-disabled-rules-file'.  Mutated by the
+`_ltex.disableRules' code action and persisted back to the file.  Merged
+with the pristine defcustom `lsp-ltex-plus-disabled-rules' into
+`lsp-ltex-plus--disabled-rules-merged' for the server.")
+
+(defvar lsp-ltex-plus--hidden-false-positives-stored nil
+  "Hidden-false-positives plist loaded from on-disk file.
+File location: `lsp-ltex-plus-hidden-false-positives-file'.  Mutated by
+the `_ltex.hideFalsePositives' code action and persisted back.  Merged
+with the pristine defcustom `lsp-ltex-plus-hidden-false-positives' into
+`lsp-ltex-plus--hidden-false-positives-merged' for the server.")
+
+(defvar lsp-ltex-plus--dictionary-merged nil
+  "Merge of custom-defined words and on-disk-defined words.
+Custom-defined words are stored in `lsp-ltex-plus-dictionary', while
+on-disk-defined words are stored in `lsp-ltex-plus--dictionary-stored'.
+Read by the server; recomputed whenever either source changes.")
+
+(defvar lsp-ltex-plus--enabled-rules-merged nil
+  "Merge of custom-defined rules and on-disk-defined rules.
+Custom-defined rules are stored in `lsp-ltex-plus-enabled-rules', while
+on-disk-defined rules are stored in
+`lsp-ltex-plus--enabled-rules-stored'.  Read by the server; recomputed
+whenever either source changes.")
+
+(defvar lsp-ltex-plus--disabled-rules-merged nil
+  "Merge of custom-defined rules and on-disk-defined rules.
+Custom-defined rules are stored in `lsp-ltex-plus-disabled-rules', while
+on-disk-defined rules are stored in
+`lsp-ltex-plus--disabled-rules-stored'.  Read by the server; recomputed
+whenever either source changes.")
+
+(defvar lsp-ltex-plus--hidden-false-positives-merged nil
+  "Merge of custom-defined false positives and on-disk-defined ones.
+Custom-defined false positives are stored in
+`lsp-ltex-plus-hidden-false-positives', while on-disk-defined ones are
+stored in `lsp-ltex-plus--hidden-false-positives-stored'.  Read by the
+server; recomputed whenever either source changes.")
 
 (defun lsp-ltex-plus--elapsed ()
   "Return seconds (float) since `lsp-ltex-plus--start-time' or Emacs init."
@@ -465,19 +545,37 @@ Items in vectors are merged and deduplicated using `string=`."
     res))
 
 (defun lsp-ltex-plus--load-external-settings ()
-  "Load and merge external settings from disk into current variables."
-  (setq lsp-ltex-plus--dictionary
-        (lsp-ltex-plus--merge-plists lsp-ltex-plus--dictionary
-                                     (lsp-ltex-plus--load-plist lsp-ltex-plus-dictionary-file)))
-  (setq lsp-ltex-plus-enabled-rules
+  "Load external settings from disk and recompute merged views.
+Reads each of the four on-disk plist files into its `-stored'
+variable, then rebuilds the `-merged' variables by combining the
+stored values with the pristine defcustoms.  The defcustoms
+themselves are never mutated."
+  (setq lsp-ltex-plus--dictionary-stored
+        (lsp-ltex-plus--load-plist lsp-ltex-plus-dictionary-file))
+  (setq lsp-ltex-plus--enabled-rules-stored
+        (lsp-ltex-plus--load-plist lsp-ltex-plus-enabled-rules-file))
+  (setq lsp-ltex-plus--disabled-rules-stored
+        (lsp-ltex-plus--load-plist lsp-ltex-plus-disabled-rules-file))
+  (setq lsp-ltex-plus--hidden-false-positives-stored
+        (lsp-ltex-plus--load-plist lsp-ltex-plus-hidden-false-positives-file))
+  (lsp-ltex-plus--recompute-merged))
+
+(defun lsp-ltex-plus--recompute-merged ()
+  "Rebuild the four `-merged' plists from defcustoms + `-stored' values.
+Called after any change to a `-stored' variable (e.g. a code-action
+write) and at the end of `lsp-ltex-plus--load-external-settings'."
+  (setq lsp-ltex-plus--dictionary-merged
+        (lsp-ltex-plus--merge-plists lsp-ltex-plus-dictionary
+                                     lsp-ltex-plus--dictionary-stored))
+  (setq lsp-ltex-plus--enabled-rules-merged
         (lsp-ltex-plus--merge-plists lsp-ltex-plus-enabled-rules
-                                     (lsp-ltex-plus--load-plist lsp-ltex-plus-enabled-rules-file)))
-  (setq lsp-ltex-plus-disabled-rules
+                                     lsp-ltex-plus--enabled-rules-stored))
+  (setq lsp-ltex-plus--disabled-rules-merged
         (lsp-ltex-plus--merge-plists lsp-ltex-plus-disabled-rules
-                                     (lsp-ltex-plus--load-plist lsp-ltex-plus-disabled-rules-file)))
-  (setq lsp-ltex-plus--hidden-false-positives
-        (lsp-ltex-plus--merge-plists lsp-ltex-plus--hidden-false-positives
-                                     (lsp-ltex-plus--load-plist lsp-ltex-plus-hidden-false-positives-file))))
+                                     lsp-ltex-plus--disabled-rules-stored))
+  (setq lsp-ltex-plus--hidden-false-positives-merged
+        (lsp-ltex-plus--merge-plists lsp-ltex-plus-hidden-false-positives
+                                     lsp-ltex-plus--hidden-false-positives-stored)))
 
 (defun lsp-ltex-plus--add-to-plist (plist-sym file-path lang items)
   "Add ITEMS for LANG to the plist stored in PLIST-SYM and save to FILE-PATH."
@@ -489,9 +587,37 @@ Items in vectors are merged and deduplicated using `string=`."
     (lsp-ltex-plus--save-plist merged file-path)))
 
 (defun lsp-ltex-plus-list-dictionary ()
-  "Print the current external dictionary content to the echo area."
+  "Print the merged dictionary currently in effect to the echo area.
+The value shown is `lsp-ltex-plus--dictionary-merged' — the union of
+the user-provided defcustom `lsp-ltex-plus-dictionary' and the
+on-disk `lsp-ltex-plus-dictionary-file'."
   (interactive)
-  (message "[lsp-ltex-plus] External Dictionary: %S" lsp-ltex-plus--dictionary))
+  (message "[lsp-ltex-plus] Dictionary: %S" lsp-ltex-plus--dictionary-merged))
+
+(defun lsp-ltex-plus--notify-ltex-workspaces ()
+  "Send `workspace/didChangeConfiguration' to every ltex-ls-plus workspace.
+No-op if `lsp-mode' is not loaded or no ltex-ls-plus workspace is active."
+  (when (fboundp 'lsp-session)
+    (dolist (ws (lsp--session-workspaces (lsp-session)))
+      (when (eq 'ltex-ls-plus (lsp--workspace-server-id ws))
+        (with-lsp-workspace ws
+          (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))))))
+
+(defun lsp-ltex-plus-reload-external-settings ()
+  "Reload all external settings from disk.
+Re-reads the four plist files under `~/.emacs.d/lsp-ltex-plus/',
+rebuilds the merged views (combining each file's contents with the
+corresponding pristine defcustom), and notifies every running
+ltex-ls-plus workspace so the new state takes effect on the next
+check without a server restart.
+
+Intended for workflows where the user edits one of the files by
+hand \(e.g. bulk-adding words, removing stale disabled rules\) and
+then wants the change picked up without restarting Emacs."
+  (interactive)
+  (lsp-ltex-plus--load-external-settings)
+  (lsp-ltex-plus--notify-ltex-workspaces)
+  (message "[lsp-ltex-plus] External settings reloaded from disk."))
 
 ;;;; -- Action Handlers --------------------------------------------------------
 
@@ -511,10 +637,11 @@ Items in vectors are merged and deduplicated using `string=`."
     (if (null words-by-lang)
         (message "[lsp-ltex-plus] addToDictionary: Malformed arguments %S" args)
       (lsp-map (lambda (lang words-arr)
-                 (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--dictionary
+                 (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--dictionary-stored
                                               lsp-ltex-plus-dictionary-file
                                               lang (append words-arr nil)))
-               words-by-lang)))
+               words-by-lang)
+      (lsp-ltex-plus--recompute-merged)))
   ;; Notify server of config change so it re-fetches settings.
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
@@ -527,10 +654,11 @@ Items in vectors are merged and deduplicated using `string=`."
     (if (null rules-by-lang)
         (message "[lsp-ltex-plus] disableRules: Malformed arguments %S" args)
       (lsp-map (lambda (lang rules-arr)
-                 (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus-disabled-rules
+                 (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--disabled-rules-stored
                                               lsp-ltex-plus-disabled-rules-file
                                               lang (append rules-arr nil)))
-               rules-by-lang)))
+               rules-by-lang)
+      (lsp-ltex-plus--recompute-merged)))
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
 (defun lsp-ltex-plus--action-hide-false-positives (action)
@@ -542,10 +670,11 @@ Items in vectors are merged and deduplicated using `string=`."
     (if (null fps-by-lang)
         (message "[lsp-ltex-plus] hideFalsePositives: Malformed arguments %S" args)
       (lsp-map (lambda (lang fps-arr)
-                 (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--hidden-false-positives
+                 (lsp-ltex-plus--add-to-plist 'lsp-ltex-plus--hidden-false-positives-stored
                                               lsp-ltex-plus-hidden-false-positives-file
                                               lang (append fps-arr nil)))
-               fps-by-lang)))
+               fps-by-lang)
+      (lsp-ltex-plus--recompute-merged)))
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
 
@@ -876,10 +1005,10 @@ measurements."
   (lsp-register-custom-settings
    `(("ltex.enabled"                             ,(lambda () (vconcat (lsp-ltex-plus--enabled-languages))))
      ("ltex.language"                            lsp-ltex-plus-language)
-     ("ltex.dictionary"                          lsp-ltex-plus--dictionary)
-     ("ltex.enabledRules"                        lsp-ltex-plus-enabled-rules)
-     ("ltex.disabledRules"                       lsp-ltex-plus-disabled-rules)
-     ("ltex.hiddenFalsePositives"                lsp-ltex-plus--hidden-false-positives)
+     ("ltex.dictionary"                          lsp-ltex-plus--dictionary-merged)
+     ("ltex.enabledRules"                        lsp-ltex-plus--enabled-rules-merged)
+     ("ltex.disabledRules"                       lsp-ltex-plus--disabled-rules-merged)
+     ("ltex.hiddenFalsePositives"                lsp-ltex-plus--hidden-false-positives-merged)
      ("ltex.bibtex.fields"                       lsp-ltex-plus-bibtex-fields)
      ("ltex.latex.commands"                      lsp-ltex-plus-latex-commands)
      ("ltex.latex.environments"                  lsp-ltex-plus-latex-environments)
@@ -941,9 +1070,10 @@ measurements."
                       (lsp-notify "workspace/didChangeConfiguration"
                                   `(:settings (:ltex (:enabled ,(vconcat (lsp-ltex-plus--enabled-languages))
                                                                :language ,lsp-ltex-plus-language
-                                                               :enabledRules ,lsp-ltex-plus-enabled-rules
-                                                               :disabledRules ,lsp-ltex-plus-disabled-rules
-                                                               :hiddenFalsePositives ,lsp-ltex-plus--hidden-false-positives
+                                                               :dictionary ,lsp-ltex-plus--dictionary-merged
+                                                               :enabledRules ,lsp-ltex-plus--enabled-rules-merged
+                                                               :disabledRules ,lsp-ltex-plus--disabled-rules-merged
+                                                               :hiddenFalsePositives ,lsp-ltex-plus--hidden-false-positives-merged
                                                                :bibtex (:fields ,lsp-ltex-plus-bibtex-fields)
                                                                :latex (:commands ,lsp-ltex-plus-latex-commands
                                                                                  :environments ,lsp-ltex-plus-latex-environments)

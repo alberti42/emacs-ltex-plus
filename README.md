@@ -1,5 +1,9 @@
 # Emacs LTeX+
 
+<!-- ltex: language=en-GB -->
+<!-- ltex: dictionary+=plist -->
+<!-- ltex: dictionary+=LTeX+ -->
+
 `lsp-ltex-plus` is a lightweight [lsp-mode](https://github.com/emacs-lsp/lsp-mode) client for **LTeX+**, a powerful grammar and spell checker powered by [LanguageTool](https://languagetool.org/).
 
 *Developed and tested on Emacs 31.0.50. Expected to work on Emacs 29 and later.*
@@ -314,8 +318,10 @@ An empty space means the parameter has no direct counterpart at that layer: typi
 | `lsp-ltex-plus-major-modes` | S† | List of `(major-mode language-id programming-p)` triples driving client activation. *Type:* list; *default:* ~80 entries covering markup and programming modes (defined in `lsp-ltex-plus-bootstrap.el`). | | |
 | `lsp-ltex-plus-check-programming-languages` | L† | When non-nil, enable grammar checking in comments of programming languages (disabled by default, matching LTeX+). *Type:* boolean; *default:* `nil`. | | |
 | `lsp-ltex-plus-language` | L | The language LanguageTool should check against (e.g. `"en-US"`, `"de-DE"`). Valid codes are listed on the [LTeX+ supported-languages page](https://ltex-plus.github.io/ltex-plus/supported-languages.html); `"auto"` attempts language detection (not recommended — no spelling). *Type:* string; *default:* `"en-US"`. | X | X |
-| `lsp-ltex-plus-enabled-rules` | L | Lists of rules that should be enabled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of rule-ID strings; *default:* `nil`. | X | X |
-| `lsp-ltex-plus-disabled-rules` | L | Lists of rules that should be disabled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of rule-ID strings; *default:* `nil`. | X | X |
+| `lsp-ltex-plus-dictionary` | L | Additional words accepted as correctly spelled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of word strings; *default:* `nil`. Merged with the on-disk `stored-dictionary` file (also grown at runtime by the *Add to dictionary* code action); for large word lists prefer the file — see [External settings](#external-settings). | X | |
+| `lsp-ltex-plus-enabled-rules` | L | Lists of rules that should be enabled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of rule-ID strings; *default:* `nil`. Merged with the on-disk `enabled-rules` file — see [External settings](#external-settings). | X | X |
+| `lsp-ltex-plus-disabled-rules` | L | Lists of rules that should be disabled (language-specific). *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of rule-ID strings; *default:* `nil`. Merged with the on-disk `disabled-rules` file (also grown at runtime by the *Disable rule* code action). | X | X |
+| `lsp-ltex-plus-hidden-false-positives` | L | Language-specific patterns that suppress false-positive diagnostics client-side-of-the-checker. *Type:* plist keyed by language code (e.g. `:en-US`) with vectors of JSON strings of the form `{"rule":"RULE_ID","sentence":"REGEX"}`; *default:* `nil`. Merged with the on-disk `hidden-false-positives` file (also grown at runtime by the *Hide false positive* code action). | X | |
 | `lsp-ltex-plus-bibtex-fields` | L | BibTeX fields whose values are to be checked. *Type:* alist of `(field-name . boolean)`; *default:* `nil`. | X | |
 | `lsp-ltex-plus-latex-commands` | L | LaTeX commands to be handled by the LaTeX parser (listed with empty arguments, e.g. `"\ref{}"`). *Type:* alist of `(command . action)`, where action is `"default"`, `"ignore"`, `"dummy"`, `"pluralDummy"`, or `"vowelDummy"`; *default:* `nil`. | X | |
 | `lsp-ltex-plus-latex-environments` | L | LaTeX environments to be handled by the LaTeX parser. *Type:* alist of `(env-name . action)`, where action is `"default"` or `"ignore"`; *default:* `nil`. | X | |
@@ -352,6 +358,44 @@ An empty space means the parameter has no direct counterpart at that layer: typi
 > **†** on `lsp-ltex-plus-check-programming-languages` — re-read at every buffer (re-)activation rather than on every check. Already-active buffers are unaffected by a mid-session flip; newly opened or toggled buffers see the new value.
 
 </details>
+
+### External settings
+
+Alongside the in-Emacs parameters above, `lsp-ltex-plus` relies on four pieces of **persistent configuration** on disk, which survive across Emacs sessions. Each of them has a defcustom counterpart so you can seed it declaratively from `:custom`. Three of the four (all except `enabled-rules`) also grow at runtime when you invoke a code action on a flagged diagnostic (`lsp-execute-code-action`, usually `s-l a` or `C-c l a`) — *Add to dictionary*, *Disable rule …*, or *Hide false positive …*.
+
+Each file is a per-language plist under `~/.emacs.d/lsp-ltex-plus/`, with language keys (`:en-US`, `:de-DE`, …) mapped to vectors of strings. Settings provided via `:custom` and via the file are kept separate: the defcustom settings are never mutated, and they are never written to disk. The server sees their merge.
+
+Code actions update the relevant file and notify the server, so the change takes effect on the next check without a restart.
+
+| File (under `~/.emacs.d/lsp-ltex-plus/`) | `:custom` variable (defcustom) | Written by code action? | Provenance |
+| :--- | :--- | :---: | :---: |
+| `stored-dictionary` | `lsp-ltex-plus-dictionary` | yes | **LTeX+ only** |
+| `enabled-rules` | `lsp-ltex-plus-enabled-rules` | no | LanguageTool |
+| `disabled-rules` | `lsp-ltex-plus-disabled-rules` | yes | LanguageTool |
+| `hidden-false-positives` | `lsp-ltex-plus-hidden-false-positives` | yes | **LTeX+ only** |
+
+#### What each one is for
+
+**Dictionary** — a per-language list of additional words that should be accepted as correctly spelled. Grown at runtime by the *Add to dictionary* code action, and seedable from `:custom`. For large hand-curated word lists, prefer editing the on-disk file directly (see [Inspecting and editing](#inspecting-and-editing) below) rather than stuffing everything into `:custom`.
+
+The dictionary is an **LTeX+ feature**, not a LanguageTool one. The `/check` HTTP endpoint exposed by LanguageTool has no `dictionary` parameter, and the personal-dictionary APIs offered to LanguageTool Premium subscribers live on a separate set of endpoints that `ltex-ls-plus` does not use. Instead, LTeX+ applies the dictionary locally. This means the following: For LanguageTool's rules pertaining to orthography errors (`MORFOLOGIK_RULE_*`, `HUNSPELL_*` and, for LT premium users, `*ORTHOGRAPHY*`), LTeX+ checks whether the listed words occur in the user's dictionary, and if so, it prevents the resulting diagnostics from being sent on to Emacs. This works identically for both the embedded local LanguageTool and the remote `lsp-ltex-plus-lt-server-uri`, since the dictionary filter runs in the LTeX+ server `ltex-ls-plus` either way.
+
+**Enabled / disabled rules** — the **coarsest-grained** control you have over what LanguageTool checks. A rule (e.g. `OXFORD_SPELLING_NOUNS`, `UPPERCASE_SENTENCE_START`, `EN_QUOTES`) either fires for every match in every document of that language, or it doesn't. Disabling a rule turns it off globally for its language; enabling a rule re-activates one that would otherwise be off (e.g. a *picky* rule, or a rule a user-level config previously disabled). These are **LanguageTool-level** settings — both the locally-embedded LanguageTool inside `ltex-ls-plus` and the hosted [LanguageTool HTTP API](https://languagetoolplus.com/http-api/) honour them (via the `enabledRules` / `disabledRules` query parameters). LTeX+ just exposes them per-language.
+
+`disabled-rules` also grows at runtime via the *Disable rule* code action; `enabled-rules` has no such writer (there is no "Enable rule" action for a flagged diagnostic) and is populated strictly from your `:custom` value and/or hand-edits to the file.
+
+**Hidden false positives** — the **finest-grained** control, and a feature unique to LTeX+ ([documented here](https://ltex-plus.github.io/ltex-plus/advanced-usage.html#hiding-false-positives-with-regular-expressions)). Each entry pairs a rule ID with a regular expression matched against the diagnostic's surrounding text. Matches are directly suppressed inside `ltex-ls-plus`, before diagnostics reach Emacs. This fine-grained control allows the user to specifically hide false positives, without entirely turning the specific rule off. So, only the specific phrasing you marked as correct stops being flagged, and the same rule keeps catching real problems elsewhere in your prose. This lives entirely outside LanguageTool's own API and has no counterpart in hosted LanguageTool. The plist `hidden-false-positives` grows at runtime via the *Hide false positive* code action; it can also be populated from `:custom` with false-positive patterns you always want suppressed.
+
+#### Rules vs. hidden false positives — which should I use?
+
+- If a rule produces *only* noise for your writing style, **disable the rule** — it's faster, cheaper, and covers everything.
+- If a rule is usually right but wrong on one recurring phrase or idiom, **hide the false positive** — the rule keeps working everywhere else, and only that specific text stops being flagged.
+
+#### Inspecting and editing
+
+- `M-x lsp-ltex-plus-list-dictionary` — prints the merged dictionary currently in effect (the union of `:custom` and file contents) to the echo area.
+- `M-x lsp-ltex-plus-reload-external-settings` — re-reads all four files, rebuilds the merged views combining them with your `:custom` values, and notifies every running `ltex-ls-plus` workspace so the change takes effect on the next check. Convenient for bulk edits: open any of the four files under `~/.emacs.d/lsp-ltex-plus/` in a buffer, edit entries across one or more languages, save, then run this command.
+- The four files are plain Emacs plists. After hand-editing, either run the reload command above or restart Emacs to pick up the change.
 
 ## Troubleshooting
 
