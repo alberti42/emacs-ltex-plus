@@ -1,5 +1,27 @@
 # Change Log
 
+## [0.3.0] - 2026-04-28
+
+### Added
+- `lsp-ltex-plus-dictionary`: user-seeded counterpart to the runtime dictionary file, accepted as a per-language plist (`'(:en-US ["WORD1" ...] :de-DE [...])`). The package never alters this defcustom. Its contents are entirely the user's responsibility. This plist is merged with the on-disk dictionary file, and the result is sent to the server.
+- `lsp-ltex-plus-hidden-false-positives`: same model as above for hidden false positives. Per-language plist of `{"rule":...,"sentence":...}` JSON strings.
+- `lsp-ltex-plus-reload-external-settings` (interactive command): Re-reads the four external plist files from disk, rebuilds the merged views, and notifies every running ltex-ls-plus workspace via `workspace/didChangeConfiguration`. Useful when you edit one of the files by hand and want the change picked up without restarting Emacs.
+- Support for more tree-sitter major-mode variants (`markdown-ts-mode`, `latex-ts-mode`, …). They are enabled by default; opt out via `lsp-ltex-plus-enable-for-modes` (`:exclude` / `:restrict-to`) if you don't want ltex-plus attaching to them.
+
+### Changed
+- External-settings architecture refactored. Defcustoms (`lsp-ltex-plus-dictionary`, `-enabled-rules`, `-disabled-rules`, `-hidden-false-positives`) are now strictly pristine — they are never mutated by code-action handlers. Each one has a private `-stored` variable holding the on-disk state and a `-merged` variable that the server reads. The merge is recomputed whenever either source changes. This lets users keep their hand-curated word lists in `:custom`/`init.el` without those values being clobbered or written to disk by the code actions.
+- `lsp-ltex-plus-list-dictionary` now reports the merged dictionary actually in effect, not just the on-disk slice.
+
+### Bugs fixed
+- **Co-tenant LSP completion silently disabled.** `lsp-ltex-plus-buffer-setup-default` was used to set six buffer-wide `lsp-mode` variables buffer-locally on every activation, most damagingly `lsp-completion-enable nil`, which closes the gate that `lsp-configure-hook` reads to enable `lsp-completion-mode`. In any buffer where ltex-plus attached alongside another server (texlab, pyright, marksman, …), `lsp-completion-at-point` was never registered and **all** LSP completion was lost, without any diagnostic. The same shape of bug affected `lsp-enable-file-watchers`, `lsp-idle-delay`, `lsp-auto-guess-root`, `lsp-ui-sideline-enable`, and `lsp-modeline-code-actions-enable`: each is a buffer-wide setting that fans out to every co-tenant server, not a per-server flag. The function and its `lsp-ltex-plus-buffer-setup-function` defcustom have been removed. For any per-buffer tweaks, we recommend the user to follow the Emacs-idiomatic pattern by adding them directly to `lsp-ltex-plus-mode-hook`. Server-side `ltex.completionEnabled` continues to control whether ltex generates completion items.
+
+### Documentation
+- New README section dedicated to external settings (file layout, semantics, hand-editing workflow).
+- Added a "pro tip" on disabling rules on a per-file basis.
+- New troubleshooting entry on unrecognized language codes.
+- Clarified role of `lsp-ltex-plus-major-modes` and described when each parameter is applied.
+- Specifications and defaults for parameters tightened.
+
 ## [0.2.1] - 2026-04-19
 
 ### Fixed
