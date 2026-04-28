@@ -2,7 +2,7 @@
 
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "27.1") (lsp-mode "6.0"))
 ;; Keywords: lsp, grammar, spelling, convenience
 ;; URL: https://github.com/alberti42/emacs-ltex-plus
@@ -596,21 +596,35 @@ No-op if `lsp-mode' is not loaded or no ltex-ls-plus workspace is active."
         (with-lsp-workspace ws
           (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))))))
 
-(defun lsp-ltex-plus-reload-external-settings ()
-  "Reload all external settings from disk.
-Re-reads the four plist files under `~/.emacs.d/lsp-ltex-plus/',
-rebuilds the merged views (combining each file's contents with the
-corresponding pristine defcustom), and notifies every running
-ltex-ls-plus workspace so the new state takes effect on the next
-check without a server restart.
+(defun lsp-ltex-plus-reload-and-notify-server ()
+  "Reload settings from disk and push them to every ltex-ls-plus workspace.
+Two steps run together:
 
-Intended for workflows where the user edits one of the files by
-hand \(e.g. bulk-adding words, removing stale disabled rules\) and
-then wants the change picked up without restarting Emacs."
+  1. Re-read the four external plist files under
+     `~/.emacs.d/lsp-ltex-plus/' and rebuild the merged views
+     (each merged view combines a file's contents with its
+     corresponding user defcustom).
+  2. Send `workspace/didChangeConfiguration' to every running
+     ltex-ls-plus workspace so the new state takes effect on the
+     next check, with no server restart.
+
+Use this whenever you change anything that the server reads —
+either by editing one of the on-disk files by hand (bulk-adding
+words, removing stale disabled rules) or by setting an
+`lsp-ltex-plus-*' defcustom in an active session and wanting the
+change applied without reloading."
   (interactive)
   (lsp-ltex-plus--load-external-settings)
   (lsp-ltex-plus--notify-ltex-workspaces)
-  (message "[lsp-ltex-plus] External settings reloaded from disk."))
+  (message "[lsp-ltex-plus] Settings reloaded and pushed to server."))
+
+;; Deprecated alias (introduced in v0.3.0, renamed in v0.3.1).
+;; The previous name described only the disk-reload half; the function
+;; also pushes to the server, which is what makes settings take effect.
+(define-obsolete-function-alias 'lsp-ltex-plus-reload-external-settings
+  #'lsp-ltex-plus-reload-and-notify-server
+  "0.3.1"
+  "Renamed to better describe what the function does (reload + push to server).")
 
 ;;;; -- Action Handlers --------------------------------------------------------
 

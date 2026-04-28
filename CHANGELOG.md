@@ -1,5 +1,10 @@
 # Change Log
 
+## [0.3.1] - 2026-04-28
+
+### Changed
+- `lsp-ltex-plus-reload-external-settings` renamed to `lsp-ltex-plus-reload-and-notify-server`. The previous name described only the disk-reload half; the function also pushes the result to every running ltex-ls-plus workspace via `workspace/didChangeConfiguration`, which is what actually makes the settings take effect. The old name remains available as an obsolete alias and will be removed in a future release.
+
 ## [0.3.0] - 2026-04-28
 
 ### Added

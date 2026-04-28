@@ -403,7 +403,7 @@ The on-disk files use the same Lisp representation — open `~/.emacs.d/lsp-ltex
 (:en-US ["Alberti" "elisp" "plist"] :it ["Caravaggio"])
 ```
 
-Hand-editing the file is supported; afterwards run `M-x lsp-ltex-plus-reload-external-settings` (see [Inspecting and editing](#inspecting-and-editing)) or restart Emacs to pick up the change.
+Hand-editing the file is supported; afterwards run `M-x lsp-ltex-plus-reload-and-notify-server` (see [Inspecting and editing](#inspecting-and-editing)) or restart Emacs to pick up the change.
 
 #### What each one is for
 
@@ -425,7 +425,7 @@ The dictionary is an **LTeX+ feature**, not a LanguageTool one. The `/check` HTT
 #### Inspecting and editing
 
 - `M-x lsp-ltex-plus-list-dictionary` — prints the merged dictionary currently in effect (the union of `:custom` and file contents) to the echo area.
-- `M-x lsp-ltex-plus-reload-external-settings` — re-reads all four files, rebuilds the merged views combining them with your `:custom` values, and notifies every running `ltex-ls-plus` workspace so the change takes effect on the next check. Convenient for bulk edits: open any of the four files under `~/.emacs.d/lsp-ltex-plus/` in a buffer, edit entries across one or more languages, save, then run this command.
+- `M-x lsp-ltex-plus-reload-and-notify-server` — re-reads all four files, rebuilds the merged views combining them with your `:custom` values, and notifies every running `ltex-ls-plus` workspace so the change takes effect on the next check. Convenient for bulk edits: open any of the four files under `~/.emacs.d/lsp-ltex-plus/` in a buffer, edit entries across one or more languages, save, then run this command. Also the right command to run after changing an `lsp-ltex-plus-*` defcustom in a live session — it pushes the new value to the server without an Emacs restart.
 - The four files are plain Emacs plists. After hand-editing, either run the reload command above or restart Emacs to pick up the change.
 
 #### Pro tip: per-file overrides with magic comments
