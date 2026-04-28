@@ -352,13 +352,6 @@ time may increase significantly."
   :type 'boolean
   :group 'lsp-ltex-plus)
 
-(defcustom lsp-ltex-plus-buffer-setup-function #'lsp-ltex-plus-buffer-setup-default
-  "Function used to configure buffer-local settings when the mode is enabled.
-The default value `lsp-ltex-plus-buffer-setup-default' sets sane defaults for
-a grammar checker (disabling watchers, auto-guessing roots, etc.)."
-  :type 'function
-  :group 'lsp-ltex-plus)
-
 (defcustom lsp-ltex-plus-diagnostic-severity "warning"
   "Severity of the diagnostics corresponding to the grammar and spelling errors.
 Possible severities are \"error\", \"warning\", \"information\", and \"hint\"."
@@ -1103,19 +1096,6 @@ measurements."
 
 ;;;; -- Activation -------------------------------------------------------------
 
-(defun lsp-ltex-plus-buffer-setup-default ()
-  "Apply sane default buffer-local settings for ltex-ls-plus."
-  ;; ltex-ls-plus is not root-aware; auto-guessing avoids prompts for standalone files.
-  (setq-local lsp-auto-guess-root t)
-  ;; Watching is unnecessary and potentially expensive for this server.
-  (setq-local lsp-enable-file-watchers nil)
-  ;; UI and behavior tweaks for a grammar checker.
-  (setq-local lsp-idle-delay 0.5)
-  (setq-local lsp-completion-enable lsp-ltex-plus-completion-enabled)
-  (if (featurep 'lsp-ui)
-      (setq-local lsp-ui-sideline-enable t))
-  (setq-local lsp-modeline-code-actions-enable t))
-
 (defun lsp-ltex-plus--rejoin-workspace ()
   "Attach the current buffer to the ltex-ls-plus workspace only.
 Used when `lsp-ltex-plus-mode' activates in a buffer where `lsp-mode'
@@ -1152,9 +1132,8 @@ is started for the project."
 (define-minor-mode lsp-ltex-plus-mode
   "Minor mode for LTEX+ grammar checking via `lsp-mode'.
 
-When enabled, this mode configures the buffer for ltex-ls-plus and starts
-the server.  It uses `lsp-ltex-plus-buffer-setup-function' to apply
-buffer-local settings.
+When enabled, this mode starts the ltex-ls-plus server for the current
+buffer.  Run `lsp-ltex-plus-mode-hook' to apply any per-buffer tweaks.
 
 If the current major mode is not in `lsp-ltex-plus-major-modes', it is
 registered automatically before the server starts.  When called
@@ -1209,7 +1188,6 @@ silently."
                  lsp-ltex-plus-ls-plus-executable)
                 (setq lsp-ltex-plus-mode nil))
             (lsp-ltex-plus--log "Enabling LTEX+ in %s" (buffer-name))
-            (funcall lsp-ltex-plus-buffer-setup-function)
             (cond
              ;; lsp-mode not yet loaded — defensive, deferred startup.
              ((not (fboundp 'lsp))
