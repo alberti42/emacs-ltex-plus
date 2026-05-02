@@ -339,7 +339,7 @@ An empty space means the parameter has no direct counterpart at that layer: typi
 | `lsp-ltex-plus-java-initial-heap` | R | Initial size of the Java heap in megabytes (`-Xms`). *Type:* integer; *default:* `64`. | X | |
 | `lsp-ltex-plus-java-max-heap` | R | Maximum size of the Java heap in megabytes (`-Xmx`). *Type:* integer; *default:* `512`. | X | |
 | `lsp-ltex-plus-sentence-cache-size` | R | Size of the LanguageTool `ResultCache` in sentences. Lower values reduce RAM usage but may significantly slow down checking. *Type:* integer; *default:* `2000`. | X | X |
-| `lsp-ltex-plus-completion-enabled` | L | Controls whether completion (IntelliSense) is enabled. *Type:* boolean; *default:* `nil`. | X | |
+| `lsp-ltex-plus-completion-enabled` | L | Controls whether word completion is enabled. *Type:* boolean; *default:* `nil`. | X | |
 | `lsp-ltex-plus-diagnostic-severity` | L | Severity of the diagnostics. *Choices:* `"error"`, `"warning"` (default), `"information"`, `"hint"`. | X | |
 | `lsp-ltex-plus-check-frequency` | L | Controls when documents should be checked. *Choices:* `"edit"` (default, on every keystroke), `"save"` (on open and save), `"manual"` (explicit commands only). | X | |
 | `lsp-ltex-plus-clear-diagnostics-when-closing-file` | L | Whether to clear diagnostics when a file is closed. *Type:* boolean; *default:* `t`. | X | |
