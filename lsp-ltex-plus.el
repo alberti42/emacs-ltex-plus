@@ -714,10 +714,37 @@ outgoing side is needed (except for the empty-map case handled in the
          (count (cond ((vectorp items) (length items))
                       ((listp items) (length items))
                       (t 0)))
-         (entry (list :dictionary           lsp-ltex-plus--dictionary-merged
-                      :disabledRules        lsp-ltex-plus--disabled-rules-merged
-                      :enabledRules         lsp-ltex-plus--enabled-rules-merged
-                      :hiddenFalsePositives lsp-ltex-plus--hidden-false-positives-merged))
+         ;; Bridge an Elisp/JSON ambiguity for the four fields below.
+         ;;
+         ;; Protocol contract (VS Code's TS type `LanguageSpecificSettingValue')
+         ;; says each field is a JSON object — never nullable.  An empty value
+         ;; must serialize as `{}', not `null'.
+         ;;
+         ;; In Elisp, `nil' simultaneously means false, the empty list, the
+         ;; empty plist, and the empty alist — one value plays many roles.
+         ;; JSON has no such conflation: `null' and `{}' are distinct.  When
+         ;; `json-serialize' (Emacs's libjansson wrapper) sees `nil', it has
+         ;; to pick one, and it picks `null'.  The Elisp -> JSON mapping is:
+         ;;
+         ;;   nil                          -> null
+         ;;   (:k v ...)   (keyword plist) -> {"k": v, ...}
+         ;;   hash-table                   -> {} (or populated object)
+         ;;   [a b]        (vector)        -> [a, b]
+         ;;   '()          (= nil)         -> null   (NOT [])
+         ;;
+         ;; The merged vars below are plists keyed by language code (e.g.
+         ;; `(:en-US ["foo"])').  When non-empty they serialize correctly as
+         ;; JSON objects.  When empty they are `nil', which would emit `null'
+         ;; and violate the protocol contract.  Substitute an empty hash-table
+         ;; for the `nil' case: a hash-table is unambiguously a JSON object,
+         ;; so `json-serialize' emits `{}' regardless of content.  One shared
+         ;; empty hash-table is fine — the structure is read-only past this
+         ;; point (only `json-serialize' touches it).
+         (empty (make-hash-table :test 'equal))
+         (entry (list :dictionary           (or lsp-ltex-plus--dictionary-merged           empty)
+                      :disabledRules        (or lsp-ltex-plus--disabled-rules-merged        empty)
+                      :enabledRules         (or lsp-ltex-plus--enabled-rules-merged         empty)
+                      :hiddenFalsePositives (or lsp-ltex-plus--hidden-false-positives-merged empty)))
          (result (make-vector count nil)))
     (dotimes (i count)
       (aset result i (copy-sequence entry)))
