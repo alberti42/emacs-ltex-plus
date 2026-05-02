@@ -684,6 +684,45 @@ change applied without reloading."
       (lsp-ltex-plus--recompute-merged)))
   (lsp-notify "workspace/didChangeConfiguration" '(:settings nil)))
 
+;;;; -- Custom Request Handlers ------------------------------------------------
+
+(defun lsp-ltex-plus--request-workspace-specific-configuration (_workspace params)
+  "Handle the custom `ltex/workspaceSpecificConfiguration' request.
+
+PARAMS carries `items', a vector of `(scopeUri URI, section SECTION)'.
+For each requested item we return the same merged language-keyed maps
+(`dictionary', `disabledRules', `enabledRules', `hiddenFalsePositives'),
+mirroring VS Code's `WorkspaceConfigurationRequestHandler'.
+
+Per-scope differentiation is intentionally not implemented: every URI
+receives the same global merged values.  See the \"Hierarchical scope
+support\" item in CLAUDE.md for what would be needed to honour scopeUri.
+
+PARAMS may arrive as either a plist (when `lsp-use-plists' is non-nil)
+or a hash-table (the default).  We read it via `lsp-get', the
+representation-agnostic accessor exported by lsp-mode, and count the
+items defensively for both vector and list shapes.
+
+The result is a vector — one entry per requested item — to match the
+shape `vscode-languageclient' returns to the server.  Each entry is a
+plist with keyword keys; `json-serialize' converts those to JSON object
+keys regardless of `lsp-use-plists', so no hash-table conversion on the
+outgoing side is needed (except for the empty-map case handled in the
+`let*' below)."
+  (lsp-ltex-plus--log "ltex/workspaceSpecificConfiguration request: %S" params)
+  (let* ((items (lsp-get params :items))
+         (count (cond ((vectorp items) (length items))
+                      ((listp items) (length items))
+                      (t 0)))
+         (entry (list :dictionary           lsp-ltex-plus--dictionary-merged
+                      :disabledRules        lsp-ltex-plus--disabled-rules-merged
+                      :enabledRules         lsp-ltex-plus--enabled-rules-merged
+                      :hiddenFalsePositives lsp-ltex-plus--hidden-false-positives-merged))
+         (result (make-vector count nil)))
+    (dotimes (i count)
+      (aset result i (copy-sequence entry)))
+    result))
+
 
 ;;;; -- Lsp-mode Patch ---------------------------------------------------------
 
@@ -1105,7 +1144,16 @@ measurements."
     :action-handlers
     (lsp-ht ("_ltex.addToDictionary"     #'lsp-ltex-plus--action-add-to-dictionary)
             ("_ltex.disableRules"        #'lsp-ltex-plus--action-disable-rules)
-            ("_ltex.hideFalsePositives"  #'lsp-ltex-plus--action-hide-false-positives))))
+            ("_ltex.hideFalsePositives"  #'lsp-ltex-plus--action-hide-false-positives))
+    ;; PoC: advertise the custom capability so ltex-ls-plus issues
+    ;; `ltex/workspaceSpecificConfiguration' on every check.  Mirrors
+    ;; VS Code's extension.ts initializationOptions.
+    :initialization-options
+    (lambda ()
+      '(:customCapabilities (:workspaceSpecificConfiguration t)))
+    :request-handlers
+    (lsp-ht ("ltex/workspaceSpecificConfiguration"
+             #'lsp-ltex-plus--request-workspace-specific-configuration))))
   (lsp-ltex-plus--log "lsp-ltex-plus--setup completed."))
 
 ;;;; -- Activation -------------------------------------------------------------
