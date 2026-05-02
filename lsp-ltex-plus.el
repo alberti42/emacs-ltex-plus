@@ -448,6 +448,33 @@ Custom-defined false positives are stored in
 stored in `lsp-ltex-plus--hidden-false-positives-stored'.  Read by the
 server; recomputed whenever either source changes.")
 
+;; -- JSON-serialization helpers -----------------------------------------------
+;;
+;; In Elisp `nil' is overloaded: it is `false', the empty list, the empty plist,
+;; and the empty alist all at once.  `json-serialize' resolves this to JSON
+;; `null'.  Several settings the server reads must be either a JSON object or a
+;; JSON boolean — never `null'.  These helpers normalize the value at the
+;; protocol boundary so that an unset Elisp variable serializes correctly.
+
+(defvar lsp-ltex-plus--empty-ht (make-hash-table :test 'equal)
+  "Shared, read-only empty hash-table used for nil object-typed settings.
+Substituted for nil so `json-serialize' emits {} instead of null
+for fields whose JSON type is a (possibly empty) object.  Pre-allocated
+once and shared across all call sites: the structure is only ever read
+by the JSON serializer, never mutated.")
+
+(defsubst lsp-ltex-plus--obj-or-empty (val)
+  "Return VAL if non-nil, else `lsp-ltex-plus--empty-ht'.
+For settings whose JSON type is an object — they must never serialize
+as null.  An empty hash-table is unambiguously a JSON object."
+  (or val lsp-ltex-plus--empty-ht))
+
+(defsubst lsp-ltex-plus--bool (val)
+  "Return JSON-correct boolean for VAL: t for non-nil, `:json-false' otherwise.
+For settings whose JSON type is a boolean.  Without this, a nil
+defcustom would serialize as JSON null rather than false."
+  (if val t :json-false))
+
 (defun lsp-ltex-plus--elapsed ()
   "Return seconds (float) since `lsp-ltex-plus--start-time' or Emacs init."
   (float-time (time-subtract (current-time)
@@ -691,7 +718,7 @@ change applied without reloading."
 
 PARAMS carries `items', a vector of `(scopeUri URI, section SECTION)'.
 For each requested item we return the same merged language-keyed maps
-(`dictionary', `disabledRules', `enabledRules', `hiddenFalsePositives'),
+\(`dictionary', `disabledRules', `enabledRules', `hiddenFalsePositives'),
 mirroring VS Code's `WorkspaceConfigurationRequestHandler'.
 
 Per-scope differentiation is intentionally not implemented: every URI
@@ -707,44 +734,22 @@ The result is a vector — one entry per requested item — to match the
 shape `vscode-languageclient' returns to the server.  Each entry is a
 plist with keyword keys; `json-serialize' converts those to JSON object
 keys regardless of `lsp-use-plists', so no hash-table conversion on the
-outgoing side is needed (except for the empty-map case handled in the
-`let*' below)."
+outgoing side is needed (except for empty maps, where
+`lsp-ltex-plus--obj-or-empty' substitutes the shared empty hash-table)."
   (lsp-ltex-plus--log "ltex/workspaceSpecificConfiguration request: %S" params)
   (let* ((items (lsp-get params :items))
          (count (cond ((vectorp items) (length items))
                       ((listp items) (length items))
                       (t 0)))
-         ;; Bridge an Elisp/JSON ambiguity for the four fields below.
-         ;;
-         ;; Protocol contract (VS Code's TS type `LanguageSpecificSettingValue')
-         ;; says each field is a JSON object — never nullable.  An empty value
-         ;; must serialize as `{}', not `null'.
-         ;;
-         ;; In Elisp, `nil' simultaneously means false, the empty list, the
-         ;; empty plist, and the empty alist — one value plays many roles.
-         ;; JSON has no such conflation: `null' and `{}' are distinct.  When
-         ;; `json-serialize' (Emacs's libjansson wrapper) sees `nil', it has
-         ;; to pick one, and it picks `null'.  The Elisp -> JSON mapping is:
-         ;;
-         ;;   nil                          -> null
-         ;;   (:k v ...)   (keyword plist) -> {"k": v, ...}
-         ;;   hash-table                   -> {} (or populated object)
-         ;;   [a b]        (vector)        -> [a, b]
-         ;;   '()          (= nil)         -> null   (NOT [])
-         ;;
-         ;; The merged vars below are plists keyed by language code (e.g.
-         ;; `(:en-US ["foo"])').  When non-empty they serialize correctly as
-         ;; JSON objects.  When empty they are `nil', which would emit `null'
-         ;; and violate the protocol contract.  Substitute an empty hash-table
-         ;; for the `nil' case: a hash-table is unambiguously a JSON object,
-         ;; so `json-serialize' emits `{}' regardless of content.  One shared
-         ;; empty hash-table is fine — the structure is read-only past this
-         ;; point (only `json-serialize' touches it).
-         (empty (make-hash-table :test 'equal))
-         (entry (list :dictionary           (or lsp-ltex-plus--dictionary-merged           empty)
-                      :disabledRules        (or lsp-ltex-plus--disabled-rules-merged        empty)
-                      :enabledRules         (or lsp-ltex-plus--enabled-rules-merged         empty)
-                      :hiddenFalsePositives (or lsp-ltex-plus--hidden-false-positives-merged empty)))
+         ;; The four fields below are JSON objects per VS Code's TS type
+         ;; `LanguageSpecificSettingValue' — never nullable.  Use
+         ;; `lsp-ltex-plus--obj-or-empty' to substitute the shared empty
+         ;; hash-table for nil so `json-serialize' emits `{}' rather than
+         ;; `null'.  See the helper's docstring for the underlying ambiguity.
+         (entry (list :dictionary           (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--dictionary-merged)
+                      :disabledRules        (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--disabled-rules-merged)
+                      :enabledRules         (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--enabled-rules-merged)
+                      :hiddenFalsePositives (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--hidden-false-positives-merged)))
          (result (make-vector count nil)))
     (dotimes (i count)
       (aset result i (copy-sequence entry)))
@@ -1075,18 +1080,21 @@ measurements."
 
   (lsp-ltex-plus--log "Registering settings and client...")
   (lsp-ltex-plus--log "Registering ltex-ls-plus client (priority: -1)...")
+  ;; Object- and boolean-typed fields are wrapped via the
+  ;; `--obj-or-empty' / `--bool' helpers so `nil' serializes as `{}' or
+  ;; `false' rather than `null' (which would violate the JSON schema).
   (lsp-register-custom-settings
    `(("ltex.enabled"                             ,(lambda () (vconcat (lsp-ltex-plus--enabled-languages))))
      ("ltex.language"                            lsp-ltex-plus-language)
-     ("ltex.dictionary"                          lsp-ltex-plus--dictionary-merged)
-     ("ltex.enabledRules"                        lsp-ltex-plus--enabled-rules-merged)
-     ("ltex.disabledRules"                       lsp-ltex-plus--disabled-rules-merged)
-     ("ltex.hiddenFalsePositives"                lsp-ltex-plus--hidden-false-positives-merged)
-     ("ltex.bibtex.fields"                       lsp-ltex-plus-bibtex-fields)
-     ("ltex.latex.commands"                      lsp-ltex-plus-latex-commands)
-     ("ltex.latex.environments"                  lsp-ltex-plus-latex-environments)
-     ("ltex.markdown.nodes"                      lsp-ltex-plus-markdown-nodes)
-     ("ltex.additionalRules.enablePickyRules"    lsp-ltex-plus-additional-rules-enable-picky-rules)
+     ("ltex.dictionary"                          ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--dictionary-merged)))
+     ("ltex.enabledRules"                        ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--enabled-rules-merged)))
+     ("ltex.disabledRules"                       ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--disabled-rules-merged)))
+     ("ltex.hiddenFalsePositives"                ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus--hidden-false-positives-merged)))
+     ("ltex.bibtex.fields"                       ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus-bibtex-fields)))
+     ("ltex.latex.commands"                      ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus-latex-commands)))
+     ("ltex.latex.environments"                  ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus-latex-environments)))
+     ("ltex.markdown.nodes"                      ,(lambda () (lsp-ltex-plus--obj-or-empty lsp-ltex-plus-markdown-nodes)))
+     ("ltex.additionalRules.enablePickyRules"    ,(lambda () (lsp-ltex-plus--bool lsp-ltex-plus-additional-rules-enable-picky-rules)))
      ("ltex.additionalRules.motherTongue"        lsp-ltex-plus-additional-rules-mother-tongue)
      ("ltex.additionalRules.languageModel"       lsp-ltex-plus-additional-rules-language-model)
      ("ltex.languageToolHttpServerUri"           ,(lambda () (or lsp-ltex-plus-lt-server-uri "")))
@@ -1098,10 +1106,10 @@ measurements."
      ("ltex.java.initialHeapSize"                lsp-ltex-plus-java-initial-heap)
      ("ltex.java.maximumHeapSize"                lsp-ltex-plus-java-max-heap)
      ("ltex.sentenceCacheSize"                   lsp-ltex-plus-sentence-cache-size)
-     ("ltex.completionEnabled"                   lsp-ltex-plus-completion-enabled)
+     ("ltex.completionEnabled"                   ,(lambda () (lsp-ltex-plus--bool lsp-ltex-plus-completion-enabled)))
      ("ltex.diagnosticSeverity"                  lsp-ltex-plus-diagnostic-severity)
      ("ltex.checkFrequency"                      lsp-ltex-plus-check-frequency)
-     ("ltex.clearDiagnosticsWhenClosingFile"     lsp-ltex-plus-clear-diagnostics-when-closing-file)
+     ("ltex.clearDiagnosticsWhenClosingFile"     ,(lambda () (lsp-ltex-plus--bool lsp-ltex-plus-clear-diagnostics-when-closing-file)))
      ("ltex.trace.server"                        lsp-ltex-plus-trace-server)))
 
   (lsp-register-client
@@ -1140,18 +1148,21 @@ measurements."
     :multi-root lsp-ltex-plus-multi-root
     :initialized-fn (lambda (_workspace)
                       (lsp-ltex-plus--log "Server initialized; pushing configuration...")
+                      ;; Object- and boolean-typed fields go through the
+                      ;; `--obj-or-empty' / `--bool' helpers so `nil' serializes
+                      ;; as `{}' or `false' instead of `null'.
                       (lsp-notify "workspace/didChangeConfiguration"
                                   `(:settings (:ltex (:enabled ,(vconcat (lsp-ltex-plus--enabled-languages))
                                                                :language ,lsp-ltex-plus-language
-                                                               :dictionary ,lsp-ltex-plus--dictionary-merged
-                                                               :enabledRules ,lsp-ltex-plus--enabled-rules-merged
-                                                               :disabledRules ,lsp-ltex-plus--disabled-rules-merged
-                                                               :hiddenFalsePositives ,lsp-ltex-plus--hidden-false-positives-merged
-                                                               :bibtex (:fields ,lsp-ltex-plus-bibtex-fields)
-                                                               :latex (:commands ,lsp-ltex-plus-latex-commands
-                                                                                 :environments ,lsp-ltex-plus-latex-environments)
-                                                               :markdown (:nodes ,lsp-ltex-plus-markdown-nodes)
-                                                               :additionalRules (:enablePickyRules ,lsp-ltex-plus-additional-rules-enable-picky-rules
+                                                               :dictionary ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus--dictionary-merged)
+                                                               :enabledRules ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus--enabled-rules-merged)
+                                                               :disabledRules ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus--disabled-rules-merged)
+                                                               :hiddenFalsePositives ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus--hidden-false-positives-merged)
+                                                               :bibtex (:fields ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus-bibtex-fields))
+                                                               :latex (:commands ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus-latex-commands)
+                                                                                 :environments ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus-latex-environments))
+                                                               :markdown (:nodes ,(lsp-ltex-plus--obj-or-empty lsp-ltex-plus-markdown-nodes))
+                                                               :additionalRules (:enablePickyRules ,(lsp-ltex-plus--bool lsp-ltex-plus-additional-rules-enable-picky-rules)
                                                                                                    :motherTongue ,lsp-ltex-plus-additional-rules-mother-tongue
                                                                                                    :languageModel ,lsp-ltex-plus-additional-rules-language-model)
                                                                :languageToolHttpServerUri ,(or lsp-ltex-plus-lt-server-uri "")
@@ -1163,10 +1174,10 @@ measurements."
                                                                             :initialHeapSize ,lsp-ltex-plus-java-initial-heap
                                                                             :maximumHeapSize ,lsp-ltex-plus-java-max-heap)
                                                                :sentenceCacheSize ,lsp-ltex-plus-sentence-cache-size
-                                                               :completionEnabled ,lsp-ltex-plus-completion-enabled
+                                                               :completionEnabled ,(lsp-ltex-plus--bool lsp-ltex-plus-completion-enabled)
                                                                :diagnosticSeverity ,lsp-ltex-plus-diagnostic-severity
                                                                :checkFrequency ,lsp-ltex-plus-check-frequency
-                                                               :clearDiagnosticsWhenClosingFile ,lsp-ltex-plus-clear-diagnostics-when-closing-file
+                                                               :clearDiagnosticsWhenClosingFile ,(lsp-ltex-plus--bool lsp-ltex-plus-clear-diagnostics-when-closing-file)
                                                                :trace (:server ,lsp-ltex-plus-trace-server))))))
     :action-handlers
     (lsp-ht ("_ltex.addToDictionary"     #'lsp-ltex-plus--action-add-to-dictionary)
