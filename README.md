@@ -564,6 +564,28 @@ Unless you have a specific need to isolate projects (e.g., you are experimenting
 
 Supporting orphan buffers without requiring a save is tracked as a future enhancement (synthetic `untitled:` URIs or transparent temp-file mirroring).
 
+### Word Completion Not Working with `lsp-ltex-plus-completion-enabled`
+
+**Symptom:** You set `lsp-ltex-plus-completion-enabled t` (or invoke completion explicitly with `M-x completion-at-point` / your usual completion key) in a buffer where `lsp-ltex-plus-mode` is active, but no LTeX+ word suggestions appear.
+
+**Cause:** Word completion depends on `lsp-mode`'s **buffer-wide** `lsp-completion-enable` variable, which is shared across every LSP client active in the buffer. Setting `lsp-ltex-plus-completion-enabled t` only tells LTeX+ to advertise completion to the server; the actual `textDocument/completion` requests are sent only when `lsp-completion-enable` is also non-nil. If you have set `lsp-completion-enable nil` globally — for example because you find LSP-driven completion noisy in code buffers — LTeX+ completion will be silently suppressed alongside everything else.
+
+**Fix (option 1, recommended for most users):** leave `lsp-completion-enable` at its default of `t`. This is the natural setting for LSP-driven autocompletion in code buffers, and LTeX+ will work alongside other servers without further intervention.
+
+**Fix (option 2, for users who prefer global completion off):** enable `lsp-completion-enable` only in buffers where `lsp-ltex-plus-mode` is active. The cleanest way is a small mode hook:
+
+```elisp
+(defun my/lsp-ltex-plus-buffer-defaults ()
+  "Buffer-local LSP settings for LTeX+."
+  (setq-local lsp-completion-enable lsp-ltex-plus-completion-enabled))
+
+(add-hook 'lsp-ltex-plus-mode-hook #'my/lsp-ltex-plus-buffer-defaults)
+```
+
+This pattern lets `lsp-ltex-plus-completion-enabled` act as a per-buffer override of your global preference: turn it on, and the buffer gets LSP completion (which, in a buffer where LTeX+ is the only client, means LTeX+ word completion).
+
+**Caveat for option 2.** Because the hook copies `lsp-ltex-plus-completion-enabled` into the buffer-wide `lsp-completion-enable`, it has side effects on **every** LSP client in the same buffer. If you later set `lsp-ltex-plus-completion-enabled nil`, the hook will *also* disable completion for any co-tenant servers (e.g. `basedpyright` or `texlab` running in the same buffer because LTeX+ is enabled for code comments). If you flip the variable off, remove or amend the hook accordingly to avoid surprising other clients.
+
 ## Under the Hood
 
 This section is for users who want to understand how `lsp-ltex-plus` works internally — useful context if you hit an unexpected issue or simply want to know what is happening behind the scenes.
