@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.3.2] - 2026-05-03
+
+### Added
+- **`ltex/workspaceSpecificConfiguration` request handler.** The client now advertises `initializationOptions.customCapabilities.workspaceSpecificConfiguration: true` and registers a handler that responds with the four merged language-keyed maps (`dictionary`, `disabledRules`, `enabledRules`, `hiddenFalsePositives`). Without this opt-in, ltex-ls-plus skips both `workspace/configuration` and the LTEX-custom configuration pull on each check, leaving the server with stale per-language data — initial `textDocument/didOpen` produces diagnostics, but subsequent `textDocument/didChange` notifications produce none. Mirrors the pattern used by `vscode-ltex-plus`. Per-scope (per-URI) differentiation is not yet implemented; every `scopeUri` receives the same global merged values.
+
+### Fixed
+- **Empty maps and booleans no longer serialize as JSON `null`.** The `workspace/didChangeConfiguration` push and the responses to `workspace/configuration` and `ltex/workspaceSpecificConfiguration` were emitting `null` for any setting whose Elisp value was `nil` (the empty plist). The server tolerated this, but `null` violates the protocol's expected types — booleans should be `false`, language-keyed maps should be `{}`. Two new internal helpers (`lsp-ltex-plus--obj-or-empty`, `lsp-ltex-plus--bool`) normalize these at the protocol boundary, backed by a single shared empty hash-table.
+
+### Documentation
+- New troubleshooting subsection: "Keep `lsp-completion-enable` and `lsp-ltex-plus-completion-enabled` in sync." Documents an observed but not-yet-fully-understood instability that appears when these two flags are configured asymmetrically (client-side completion on, server-side off): missing diagnostics after edits, spurious code-action polling. Recommends a buffer-local sync via the mode hook.
+- Removed a stray reference to "IntelliSense" in the completion defcustom docstring.
+
 ## [0.3.1] - 2026-04-28
 
 ### Changed
