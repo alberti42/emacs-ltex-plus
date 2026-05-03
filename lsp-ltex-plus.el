@@ -886,7 +886,7 @@ discarded."
                                                  (split-string
                                                   (substring-no-properties chunk
                                                                            (or (string-match-p "Content-Length" chunk)
-                                                                               (error "Unable to find Content-Length header."))
+                                                                               (error "Unable to find Content-Length header"))
                                                                            body-sep-pos)
                                                   "\r\n")))
                             body-received 0
@@ -962,10 +962,10 @@ discarded."
 (cl-defun lsp-core-request-while-no-input-patch (method params)
   "Patched `lsp-request-while-no-input' with stale callback protection.
 
-This patch prevents the success/error callbacks from throwing \\='lsp-done
-after the function has already unwound (e.g. due to timeout or
-cancellation), which would otherwise cause the throw to escape to
-the top level."
+Send METHOD with PARAMS, but prevent the success/error callbacks
+from throwing \\='lsp-done after the function has already unwound
+\(e.g. due to timeout or cancellation), which would otherwise
+cause the throw to escape to the top level."
   (if (or non-essential (not lsp-request-while-no-input-may-block))
       (let* ((send-time (float-time))
              ;; max time by which we must get a response
