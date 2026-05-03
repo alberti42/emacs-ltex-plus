@@ -372,13 +372,24 @@ Possible severities are \"error\", \"warning\", \"information\", and \"hint\"."
   :group 'lsp-ltex-plus)
 
 (defcustom lsp-ltex-plus-apply-kind-first-patch nil
-  "Whether to apply the \\='Kind-First\\=' routing patch to `lsp-mode'.
-This patch redefines `lsp--parser-on-message' to prioritize the
-\\='method\\=' field, preventing deadlocks when server-initiated
-requests (like `workspace/configuration') collide with client
-requests.
+  "Whether to apply the \\='Kind-First\\=' and related protocol patches to `lsp-mode'.
+When non-nil, several surgical fixes are applied to `lsp-mode' to
+improve protocol robustness:
 
-Note: This is a global surgical patch affecting all LSP servers."
+1. Kind-First routing: prioritizes the \\='method\\=' field in
+   `lsp--parser-on-message', preventing deadlocks when
+   server-initiated requests (like `workspace/configuration')
+   collide with client response IDs.
+
+2. Resilient message dispatch: ensures that when the server sends
+   multiple updates bundled together, an interruption in one
+   (like typing during completion) doesn't cause the rest of the
+   bundle to be discarded.
+
+3. Stale callback protection: prevents synchronous requests from
+   throwing after they have already timed out or been cancelled.
+
+Note: These are global surgical patches affecting all LSP servers."
   :type 'boolean
   :group 'lsp-ltex-plus)
 
@@ -756,30 +767,22 @@ outgoing side is needed (except for empty maps, where
     result))
 
 
-;;;; -- Lsp-mode Patch ---------------------------------------------------------
+;;;; -- Lsp-mode Protocol Patches -----------------------------------------------
 
-;; This section contains a protocol-level deadlock fix for `lsp-mode`.
+;; This section contains surgical protocol-level fixes for `lsp-mode`.
+;; They are applied only when `lsp-ltex-plus-apply-kind-first-patch' is non-nil.
 ;;
-;; PROBLEM: ID COLLISIONS
+;; 1. Kind-First Routing: prioritizes the \\='method\\=' field over \\='id\\=',
+;;    preventing deadlocks when server-initiated requests collide with client
+;;    response IDs.
 ;;
-;; Standard `lsp-mode` routes incoming JSON-RPC messages based on the \\='id\\=' field:
-;; 1. If \\='id\\=' is present, it\\='s treated as a RESPONSE to a client request.
-;; 2. If \\='method\\=' is present (but no \\='id\\='), it\\='s a NOTIFICATION or REQUEST.
+;; 2. Resilient Batch Dispatch: patches the process filter to salvage messages
+;;    on framing errors and ensure that a non-local exit (like a
+;;    completion-interrupt) from one message doesn't abandon the rest of the
+;;    batch.
 ;;
-;; LTeX+ frequently initiates its own requests (like `workspace/configuration`)
-;; to fetch your dictionary and rules. If the server-initiated request uses an
-;; ID that `lsp-mode` is already tracking for a client-side request, `lsp-mode`
-;; will misroute the server\\='s request as a response to its own request.
-;; This results in a protocol deadlock where both sides are waiting for each
-;; other indefinitely.
-;;
-;; SOLUTION: KIND-FIRST ROUTING
-;;
-;; The "Kind-First" patch below provides `lsp-core--parser-on-message-patch'
-;; which prioritizes the \\='method\\=' field over the \\='id\\=' field.
-;; If a \\='method\\=' is present, we know the message is a Request or
-;; Notification from the server, regardless of whether the ID happens to
-;; collide with an internal Emacs ID.
+;; 3. Stale Callback Protection: prevents synchronous requests from throwing
+;;    after they have already timed out or been cancelled.
 
 (defun lsp-core--parser-on-message-patch (json-data workspace)
   "Patched `lsp--parser-on-message' to prioritize \\='method\\=' (Kind-First routing).
@@ -856,13 +859,164 @@ to client requests when IDs collide."
             ('request
              (lsp--on-request workspace json-data))))))))
 
+(defun lsp-core--create-filter-function-patch (workspace)
+  "Patched `lsp--create-filter-function' with resilient message dispatch.
+WORKSPACE is the active workspace.
+
+This patch ensures that when the server sends multiple updates
+bundled together, an interruption in one (like typing during
+completion) doesn\\='t cause the rest of the bundle to be
+discarded."
+  (let ((body-received 0)
+        leftovers body-length body chunk)
+    (lambda (_proc input)
+      (setf chunk (if (s-blank? leftovers)
+                      (encode-coding-string input 'utf-8-unix t)
+                    (concat leftovers (encode-coding-string input 'utf-8-unix t))))
+
+      (let (messages)
+        (condition-case framing-err
+            (while (not (s-blank? chunk))
+              (if (not body-length)
+                  ;; Read headers
+                  (if-let* ((body-sep-pos (string-match-p "\r\n\r\n" chunk)))
+                      ;; We've got all the headers, handle them all at once:
+                      (setf body-length (lsp--get-body-length
+                                         (mapcar #'lsp--parse-header
+                                                 (split-string
+                                                  (substring-no-properties chunk
+                                                                           (or (string-match-p "Content-Length" chunk)
+                                                                               (error "Unable to find Content-Length header."))
+                                                                           body-sep-pos)
+                                                  "\r\n")))
+                            body-received 0
+                            leftovers nil
+                            chunk (substring-no-properties chunk (+ body-sep-pos 4)))
+
+                    ;; Haven't found the end of the headers yet. Save everything
+                    ;; for when the next chunk arrives and await further input.
+                    (setf leftovers chunk
+                          chunk nil))
+                (let* ((chunk-length (string-bytes chunk))
+                       (left-to-receive (- body-length body-received))
+                       (this-body (if (< left-to-receive chunk-length)
+                                      (prog1 (substring-no-properties chunk 0 left-to-receive)
+                                        (setf chunk (substring-no-properties chunk left-to-receive)))
+                                    (prog1 chunk
+                                      (setf chunk nil))))
+                       (body-bytes (string-bytes this-body)))
+                  (push this-body body)
+                  (setf body-received (+ body-received body-bytes))
+                  (when (>= chunk-length left-to-receive)
+                    (condition-case err
+                        (with-temp-buffer
+                          (apply #'insert
+                                 (nreverse
+                                  (prog1 body
+                                    (setf leftovers nil
+                                          body-length nil
+                                          body-received nil
+                                          body nil))))
+                          (decode-coding-region (point-min)
+                                                (point-max)
+                                                'utf-8)
+                          (goto-char (point-min))
+                          (push (lsp-json-read-buffer) messages))
+
+                      (error
+                       (lsp-warn "Failed to parse the following chunk:\n'''\n%s\n'''\nwith message %s"
+                                 (concat leftovers input)
+                                 err)))))))
+          (error
+           ;; Framing error escaped the loop (e.g. mid-body bytes mistaken for
+           ;; headers after a JSON parse cleared framing state). Reset framing
+           ;; state and fall through so already-parsed messages still reach the
+           ;; dispatcher instead of being silently discarded.
+           (lsp-warn "[lsp-filter] framing-error-salvage: salvaged %d parsed message(s); error: %S"
+                     (length messages) framing-err)
+           (setf leftovers nil
+                 body-length nil
+                 body-received 0
+                 body nil)))
+        ;; Per-message dispatch: catch known throw tags so a single
+        ;; message's non-local exit doesn't abandon the rest of the batch.
+        ;; The throw is re-issued after all messages have been dispatched,
+        ;; so the original target catch (e.g. (catch 'lsp-done ...) in
+        ;; `lsp-request-while-no-input' or (lsp--catch 'input ...) in
+        ;; lsp-completion.el) still receives it.
+        (let ((sentinel (cons nil nil))
+              queued-tag queued-value)
+          (dolist (msg (nreverse messages))
+            (let ((r (catch 'lsp-done
+                       (let ((r2 (catch 'input
+                                   (lsp--parser-on-message msg workspace)
+                                   sentinel)))
+                         (unless (eq r2 sentinel)
+                           (setq queued-tag 'input queued-value r2))
+                         sentinel))))
+              (unless (eq r sentinel)
+                (setq queued-tag 'lsp-done queued-value r))))
+          (when queued-tag
+            (throw queued-tag queued-value)))))))
+
+(cl-defun lsp-core-request-while-no-input-patch (method params)
+  "Patched `lsp-request-while-no-input' with stale callback protection.
+
+This patch prevents the success/error callbacks from throwing \\='lsp-done
+after the function has already unwound (e.g. due to timeout or
+cancellation), which would otherwise cause the throw to escape to
+the top level."
+  (if (or non-essential (not lsp-request-while-no-input-may-block))
+      (let* ((send-time (float-time))
+             ;; max time by which we must get a response
+             (expected-time
+              (and
+               lsp-response-timeout
+               (+ send-time lsp-response-timeout)))
+             resp-result resp-error done?
+             (catch-active t))
+        (unwind-protect
+            (progn
+              (lsp-request-async method params
+                                 (lambda (res)
+                                   (when catch-active
+                                     (setf resp-result (or res :finished))
+                                     (throw 'lsp-done '_)))
+                                 :error-handler (lambda (err)
+                                                  (when catch-active
+                                                    (setf resp-error err)
+                                                    (throw 'lsp-done '_)))
+                                 :mode 'detached
+                                 :cancel-token :sync-request)
+              (while (not (or resp-error resp-result (input-pending-p)))
+                (catch 'lsp-done
+                  (sit-for
+                   (if expected-time (- expected-time send-time) 1)))
+                (setq send-time (float-time))
+                (when (and expected-time (< expected-time send-time))
+                  (error "Timeout while waiting for response.  Method: %s" method)))
+              (setq done? (or resp-error resp-result))
+              (cond
+               ((eq resp-result :finished) nil)
+               (resp-result resp-result)
+               ((lsp-json-error? resp-error) (error (lsp:json-error-message resp-error)))
+               ((lsp-json-error? (cl-first resp-error))
+                (error (lsp:json-error-message (cl-first resp-error))))))
+          (setq catch-active nil)
+          (unless done?
+            (lsp-cancel-request-by-token :sync-request))
+          (when (and (input-pending-p) lsp--throw-on-input)
+            (throw 'input :interrupted))))
+    (lsp-request method params)))
+
 (defun lsp-ltex-plus--apply-lsp-mode-patch ()
-  "Apply the protocol patch to `lsp-mode'.
-This patches `lsp--parser-on-message' using :override advice to
-prioritize the \\='method\\=' field over \\='id\\=', preventing
-deadlocks when server-initiated requests collide with client
-response IDs."
-  (advice-add 'lsp--parser-on-message :override #'lsp-core--parser-on-message-patch))
+  "Apply the protocol patches to `lsp-mode'.
+These patch `lsp--parser-on-message', `lsp--create-filter-function',
+and `lsp-request-while-no-input' using :override advice to improve
+protocol robustness."
+  (advice-add 'lsp--parser-on-message :override #'lsp-core--parser-on-message-patch)
+  (advice-add 'lsp--create-filter-function :override #'lsp-core--create-filter-function-patch)
+  (advice-add 'lsp-request-while-no-input :override #'lsp-core-request-while-no-input-patch))
 
 (defun lsp-ltex-plus--suppress-progress (orig-fn workspace params)
   "Swallow ltex-ls-plus progress notifications.
