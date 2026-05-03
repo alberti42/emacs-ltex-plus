@@ -23,7 +23,7 @@
 ;;    texlab or basedpyright) without interference.
 ;;
 ;; 2. Transparent Settings: Settings are registered via lsp-register-custom-settings.
-;;    The server fetches these via workspace/configuration.  Updating the Lisp
+;;    The server fetches these via `workspace/configuration'.  Updating the Lisp
 ;;    variables (like the dictionary) results in immediate server updates on
 ;;    the next check.
 ;;
@@ -375,7 +375,7 @@ Possible severities are \"error\", \"warning\", \"information\", and \"hint\"."
   "Whether to apply the \\='Kind-First\\=' routing patch to `lsp-mode'.
 This patch redefines `lsp--parser-on-message' to prioritize the
 \\='method\\=' field, preventing deadlocks when server-initiated
-requests (like workspace/configuration) collide with client
+requests (like `workspace/configuration') collide with client
 requests.
 
 Note: This is a global surgical patch affecting all LSP servers."
@@ -1183,9 +1183,28 @@ measurements."
     (lsp-ht ("_ltex.addToDictionary"     #'lsp-ltex-plus--action-add-to-dictionary)
             ("_ltex.disableRules"        #'lsp-ltex-plus--action-disable-rules)
             ("_ltex.hideFalsePositives"  #'lsp-ltex-plus--action-hide-false-positives))
-    ;; PoC: advertise the custom capability so ltex-ls-plus issues
-    ;; `ltex/workspaceSpecificConfiguration' on every check.  Mirrors
-    ;; VS Code's extension.ts initializationOptions.
+    ;; Advertise the custom capability so ltex-ls-plus issues per-document
+    ;; configuration pulls on every check.
+    ;;
+    ;; ltex-ls-plus gates BOTH the standard `workspace/configuration' request
+    ;; and the LTEX-specific `ltex/workspaceSpecificConfiguration' request on
+    ;; this single capability advertisement.  Without it, the server skips
+    ;; both pulls and falls back to whatever state was last pushed via
+    ;; `workspace/didChangeConfiguration' in `:initialized-fn' — sufficient for
+    ;; the initial `textDocument/didOpen' check, but subsqequent edits produce no
+    ;; fresh diagnostics because the server cannot retrieve the per-language
+    ;; dictionaries / disabled rules / etc. that it needs to re-check the
+    ;; document.
+    ;;
+    ;; See `lsp-ltex-plus--request-workspace-specific-configuration' below for
+    ;; the handler that answers the custom request.  `workspace/configuration'
+    ;; is answered automatically by lsp-mode from the data registered above via
+    ;; `lsp-register-custom-settings'.
+    ;;
+    ;; This custom capability mirrors VS Code's `vscode-ltex-plus' extension,
+    ;; specifically its
+    ;; `initializationOptions.customCapabilities.workspaceSpecificConfiguration'
+    ;; declaration (see `extension.ts' in `vscode-ltex-plus').
     :initialization-options
     (lambda ()
       '(:customCapabilities (:workspaceSpecificConfiguration t)))
