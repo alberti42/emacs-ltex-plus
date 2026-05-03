@@ -8,11 +8,11 @@ Separately from the original `lsp-ltex`, a second project also carries the `-plu
 
 ---
 
-## 1. Core Stability: The LSP-Protocol Patch
-The most significant technical difference is the inclusion of the **Kind-First** routing patch in `lsp-ltex-plus`. 
+## 1. Core Stability: The LSP-Protocol Patches
+The most significant technical difference is the inclusion of several **Protocol Patches** in `lsp-ltex-plus` that improve `lsp-mode`'s robustness.
 
-*   **The Problem:** The LTeX server frequently initiates its own requests (like `workspace/configuration`) to fetch your settings. Standard `lsp-mode` can misidentify these as responses to previous client requests if IDs collide (common with remote servers or high-latency environments). This leads to a permanent protocol deadlock where both Emacs and the server wait for each other indefinitely.
-*   **`lsp-ltex-plus` Solution:**
+*   **The Problem:** The LTeX server frequently initiates its own requests (like `workspace/configuration`) to fetch your settings. Standard `lsp-mode` can misidentify these as responses to previous client requests if IDs collide (common with remote servers or high-latency environments). This leads to a permanent protocol deadlock where both Emacs and the server wait for each other indefinitely. Additionally, standard `lsp-mode` is vulnerable to framing errors in batch dispatches and stale callbacks from cancelled synchronous requests.
+*   **`lsp-ltex-plus` Solution:** Includes three surgical fixes (Kind-First Routing, Resilient Message Dispatch, and Stale Callback Protection) that redefine core `lsp-mode` functions to handle these edge cases correctly. For example, the Resilient Message Dispatch fix ensures that when the server sends multiple updates bundled together, an interruption in one (like typing during completion) doesn't cause the rest of the bundle to be discarded.
     ```elisp
     ;; Kind-First routing: if a method exists, it's a server-initiated
     ;; message (request/notification) regardless of ID collisions.
@@ -21,8 +21,7 @@ The most significant technical difference is the inclusion of the **Kind-First**
                    (has-id (if has-error 'response-error 'response))
                    (t 'notification)))
     ```
-    *Source: `lsp-ltex-plus.el`, [lines 491-496](https://github.com/alberti42/emacs-ltex-plus/blob/db37bf3af620fbd21377999b22ad426fe7db2293/lsp-ltex-plus.el#L491-L496)
-*   **`lsp-ltex` Status:** Relies on default `lsp-mode` behavior, making it vulnerable to these specific protocol deadlocks.
+*   **`lsp-ltex` Status:** Relies on default `lsp-mode` behavior, making it vulnerable to these specific protocol deadlocks and message-loss scenarios.
 
 ---
 

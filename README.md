@@ -407,7 +407,7 @@ Hand-editing the file is supported; afterwards run `M-x lsp-ltex-plus-reload-and
 
 #### What each one is for
 
-**Dictionary** — a per-language list of additional words that should be accepted as correctly spelled. Grown at runtime by the *Add to dictionary* code action, and `"seedable" from `:custom`. For large hand-curated word lists, prefer editing the on-disk file directly (see [Inspecting and editing](#inspecting-and-editing) below) rather than stuffing everything into `:custom`.
+**Dictionary** — a per-language list of additional words that should be accepted as correctly spelled. Grown at runtime by the *Add to dictionary* code action, and "seedable" from `:custom`. For large hand-curated word lists, prefer editing the on-disk file directly (see [Inspecting and editing](#inspecting-and-editing) below) rather than stuffing everything into `:custom`.
 
 The dictionary is an **LTeX+ feature**, not a LanguageTool one. The `/check` HTTP endpoint exposed by LanguageTool has no `dictionary` parameter, and the personal-dictionary APIs offered to LanguageTool Premium subscribers live on a separate set of endpoints that `ltex-ls-plus` does not use. Instead, LTeX+ applies the dictionary locally. This means the following: For LanguageTool's rules pertaining to orthography errors (`MORFOLOGIK_RULE_*`, `HUNSPELL_*` and, for LT premium users, `*ORTHOGRAPHY*`), LTeX+ checks whether the listed words occur in the user's dictionary, and if so, it prevents the resulting diagnostics from being sent on to Emacs. This works identically for both the embedded local LanguageTool and the remote `lsp-ltex-plus-lt-server-uri`, since the dictionary filter runs in the LTeX+ server `ltex-ls-plus` either way.
 
@@ -621,25 +621,25 @@ A remote LanguageTool server typically adds 100–300 ms on top of both numbers,
 
 Because the warm-path message fires after every check (i.e. on essentially every keystroke when `lsp-ltex-plus-check-frequency` is `"edit"` and the debounce interval is small), it is intended for investigation only. Turn the flag off again when you are done measuring. For richer diagnostic output — including entries in the `*lsp-ltex-plus::client*` log buffer and raw JSON-RPC dumps under `/tmp` — see `lsp-ltex-plus-debug` instead; the two flags are independent and can be combined.
 
-### Lsp-mode Protocol Patch
+### Lsp-mode Protocol Patches
 
-LTeX+ frequently initiates its own requests to Emacs (e.g., to fetch your configuration). In high-latency environments—such as when using a **remote server**—these server requests often overlap with Emacs's own requests to the server (like checking a document). 
+This package includes several surgical fixes for `lsp-mode` to improve protocol robustness. They are applied globally when `lsp-ltex-plus-apply-kind-first-patch` is non-nil.
 
-Because a remote document check can take several hundred milliseconds to complete, there is a very high probability that the server will send a request while Emacs is still waiting for a response. In this scenario, a JSON-RPC "id collision" occurs: `lsp-mode`'s default parser misinterprets the server's new request as a response to its own pending check, causing both sides to hang indefinitely.
+1.  **Kind-First Routing (Fix for Communication Stalls)**: Standard `lsp-mode` routes messages by checking the `id` field first. LTeX+ frequently initiates its own requests (e.g., to fetch your configuration), which can overlap with Emacs's own requests (like checking a document). In such cases, an "id collision" can occur where `lsp-mode` misinterprets the server's new request as a response to its own pending check, causing both sides to hang indefinitely. This patch analyzes the message format (presence of a `method` field) to distinguish with certainty between requests and responses. **Highly recommended if you use a remote server and necessary for `lsp-ltex-plus` to  correctly function.**
 
-This package includes a protocol-level patch that ensures Emacs doesn't just trust request ID numbers (which can collide). Instead, it analyzes the message format to distinguish with certainty whether a message is a new request from the server or a response to a previous client request.
+2.  **Resilient Message Dispatch (Fix for Lost Updates)**: Often, the server sends several updates bundled together (for example, a progress update followed immediately by diagnostics). In standard `lsp-mode`, if processing one update is interrupted—such as when you start typing while a completion list is being shown—all other updates in that same bundle are accidentally discarded. This patch ensures that every message in a bundle is processed, even if one of them is interrupted. This patch is highly recommended for the functioning of this package.
 
-*   **When to use:** **Required** if you use a **remote/online server**. Without this patch, the connection **will** deadlock as soon as a server request overlaps with a pending document check.
-*   **When to skip:** Usually not needed if you use the **local server**, as the near-instantaneous response time makes such overlaps extremely unlikely.
-*   **Upstream Note:** I plan to submit this fix to `lsp-mode` so it can eventually be integrated into the core package. Because this is a protocol-level improvement, enabling it will generally improve the stability and reliability of **all** your other LSP clients as well.
+3.  **Stale Callback Protection**: Prevents synchronous requests from throwing `lsp-done` after they have already timed out or been cancelled. Without this, a late response to a cancelled request could escape its local scope and throw a mysterious error to the top level.
 
-To enable the patch, add this to your `:custom` block:
+To enable these patches, add this to your `:custom` block:
 
 ```elisp
 (use-package lsp-ltex-plus
   :custom
   (lsp-ltex-plus-apply-kind-first-patch t))
 ```
+
+*Note: As these are protocol-level improvements, enabling them generally improves the stability and reliability of **all** your other LSP clients as well.*
 
 ### How does `lsp-ltex-plus-mode` get set up and activated?
 
