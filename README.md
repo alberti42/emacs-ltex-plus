@@ -564,29 +564,27 @@ Unless you have a specific need to isolate projects (e.g., you are experimenting
 
 Supporting orphan buffers without requiring a save is tracked as a future enhancement (synthetic `untitled:` URIs or transparent temp-file mirroring).
 
-### Keep `lsp-completion-enable` and `lsp-ltex-plus-completion-enabled` in sync
+### Word Completion Not Working with `lsp-ltex-plus-completion-enabled`
 
-**Known limitation (under investigation):** `lsp-ltex-plus-completion-enabled` (server-side switch for LTEX+'s word completion) and `lsp-mode`'s buffer-wide `lsp-completion-enable` (client-side switch for sending `textDocument/completion` requests at all) must both be on, or both be off, in any buffer where `lsp-ltex-plus-mode` is active. Asymmetric configurations — particularly client on, server off — have reproducibly produced instability during testing: missing diagnostics after edits, spurious code-action polling, and other Heisenbug-like symptoms whose root cause is still being investigated. Same-on-both and same-off-both configurations are stable.
+**Symptom:** You set `lsp-ltex-plus-completion-enabled t` (or invoke completion explicitly with `M-x completion-at-point` / your usual completion key) in a buffer where `lsp-ltex-plus-mode` is active, but no LTeX+ word suggestions appear.
 
-**Symptoms when out of sync:**
+**Cause:** Word completion depends on `lsp-mode`'s **buffer-wide** `lsp-completion-enable` variable, which is shared across every LSP client active in the buffer. Setting `lsp-ltex-plus-completion-enabled t` only tells LTeX+ to advertise completion to the server; the actual `textDocument/completion` requests are sent only when `lsp-completion-enable` is also non-nil. If you have set `lsp-completion-enable nil` globally — for example because you find LSP-driven completion noisy in code buffers — LTeX+ completion will be silently suppressed alongside everything else.
 
-- LTeX+ completion does not appear even with `lsp-ltex-plus-completion-enabled t` (the obvious case: client says "I won't ask," so the server-side switch is irrelevant).
-- After the first check, edits stop producing fresh diagnostics. The trace shows `textDocument/didChange` going out but no `$/progress checkDocument` events following.
-- A loop of `textDocument/codeAction` requests fires every 1–2 seconds while the buffer is idle, even when there are no diagnostics at point.
+**Fix (option 1, recommended for most users):** leave `lsp-completion-enable` at its default of `t`. This is the natural setting for LSP-driven autocompletion in code buffers, and LTeX+ will work alongside other servers without further intervention.
 
-**Recommended pattern:** make `lsp-ltex-plus-completion-enabled` the single source of truth for whether LTeX+ completion is on, and copy it into `lsp-completion-enable` buffer-locally via the mode hook:
+**Fix (option 2, for users who prefer global completion off):** enable `lsp-completion-enable` only in buffers where `lsp-ltex-plus-mode` is active. The cleanest way is a small mode hook:
 
 ```elisp
 (defun my/lsp-ltex-plus-buffer-defaults ()
-  "Keep `lsp-completion-enable' in sync with the LTeX+ switch."
+  "Buffer-local LSP settings for LTeX+."
   (setq-local lsp-completion-enable lsp-ltex-plus-completion-enabled))
 
 (add-hook 'lsp-ltex-plus-mode-hook #'my/lsp-ltex-plus-buffer-defaults)
 ```
 
-This works whether your global `lsp-completion-enable` is `t` (the lsp-mode default) or `nil` (preferred by users who find LSP-driven completion noisy in code buffers). The buffer-local override takes precedence in LTeX+-managed buffers.
+This pattern lets `lsp-ltex-plus-completion-enabled` act as a per-buffer override of your global preference: turn it on, and the buffer gets LSP completion (which, in a buffer where LTeX+ is the only client, means LTeX+ word completion).
 
-**Caveat.** The hook copies `lsp-ltex-plus-completion-enabled` into the buffer-wide `lsp-completion-enable`, which is shared by every LSP client active in the same buffer. In a buffer where LTeX+ runs as an add-on alongside another server (e.g. `basedpyright` for Python with grammar checking on code comments), changing `lsp-ltex-plus-completion-enabled` will also affect the co-tenant's completion. Flip the variable consciously or amend the hook if that's a problem.
+**Caveat for option 2.** Because the hook copies `lsp-ltex-plus-completion-enabled` into the buffer-wide `lsp-completion-enable`, it has side effects on **every** LSP client in the same buffer. If you later set `lsp-ltex-plus-completion-enabled nil`, the hook will *also* disable completion for any co-tenant servers (e.g. `basedpyright` or `texlab` running in the same buffer because LTeX+ is enabled for code comments). If you flip the variable off, remove or amend the hook accordingly to avoid surprising other clients.
 
 ## Under the Hood
 
