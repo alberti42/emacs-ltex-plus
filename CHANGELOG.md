@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.3.3] - 2026-05-03
+
+### Fixed
+- **Expanded protocol patches for `lsp-mode`.** The `lsp-ltex-plus-apply-kind-first-patch` toggle now applies three surgical fixes to `lsp-mode` to improve protocol robustness:
+    - **Kind-First Routing**: prioritizing the `method` field over `id` to prevent deadlocks from ID collisions.
+    - **Resilient Message Dispatch**: ensures that when the server sends multiple updates bundled together, an interruption in one (like typing during completion) doesn't cause the rest of the bundle to be discarded.
+    - **Stale Callback Protection**: prevents synchronous requests from throwing `lsp-done` after they have already timed out or been cancelled.
+
 ## [0.3.2] - 2026-05-03
 
 ### Added
