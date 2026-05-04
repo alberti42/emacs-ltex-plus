@@ -55,6 +55,8 @@ Two caveats worth stating honestly:
 - **What you *see* on screen is slower than what the server reports.** The figures above measure the round-trip from `textDocument/didChange` to `textDocument/publishDiagnostics`. Between `publishDiagnostics` arriving and the squiggly underline appearing in the buffer, Emacs still has to pass the diagnostic through `lsp-mode`'s idle cadence (`lsp-idle-delay`, default 0.5 s), the full-sync debounce, and the Flycheck / Flymake overlay refresh. With stock settings the visible delay can add several hundred milliseconds on top of the server round-trip. The grammar checker is not the bottleneck in an Emacs session — the display pipeline typically is. Normal users, however, would likely find Emacs' default settings quite acceptable when typing or editing texts. 
 
   For a snappier response, consider lowering `lsp-idle-delay` (default 0.5 s), `flycheck-idle-change-delay` (default 0.5 s), and `lsp-debounce-full-sync-notifications-interval` (default 1.0 s). The last of these races against a secondary flush path in lsp-mode that fires whenever Emacs is about to send any outgoing LSP message — a completion request, a hover, a periodic `textDocument/documentHighlight` fired by `lsp-on-idle-hook` after `lsp-idle-delay` seconds of inactivity, or even traffic from a co-tenant server on the same buffer. Whichever of the two paths fires first drains the queue, so reducing the interval only starts to bite once it drops below typical inter-message times (~`lsp-idle-delay`). If you want the interval to be the sole flush trigger — useful mainly when benchmarking or reasoning about timing — additionally set `(setq lsp-flush-delayed-changes-before-next-message nil)` to temporarily disable the secondary flush path.
+
+  For more advanced performance tuning (such as increasing the garbage collection threshold or switching to plists), see [Slow Server Response / High CPU Usage](#slow-server-response--high-cpu-usage) in the Troubleshooting section.
 - **A remote LanguageTool server is noticeably slower.** If you point `lsp-ltex-plus-lt-server-uri` at the hosted service, the round-trip stretches to roughly **1–4 seconds** depending on network conditions and how busy the service is. That is the trade-off for Premium-only rules, but the local backend is likely what the majority of users may want for an interactive writing experience.
 
 ## Prerequisites
@@ -519,6 +521,22 @@ If you encounter crashes, try increasing the maximum heap size:
 ```
 
 While you can experiment with lower values to save system resources, be aware that setting the memory too low may result in an unstable server and frequent crashes. See [Java Runtime Configuration](#3-java-runtime-configuration) for more context.
+
+### Slow Server Response / High CPU Usage
+
+If diagnostics take a long time to appear or if Emacs feels sluggish when `lsp-ltex-plus` is active, it is often due to general LSP performance overhead rather than the grammar checker itself.
+
+1. **Run `M-x lsp-doctor`**: This command performs an automated health check of your LSP setup and provides environment-specific recommendations.
+2. **Consult the Performance Guide**: The official [lsp-mode performance page](https://emacs-lsp.github.io/lsp-mode/page/performance/) contains exhaustive advice on tuning Emacs for LSP. Two high-impact settings frequently recommended for LSP performance are:
+  - **Increase Garbage Collection Threshold**: Emacs' default is very low. Increasing it reduces the frequency of GC pauses during heavy JSON-RPC traffic:
+    ```elisp
+    (setq gc-cons-threshold 100000000) ; 100 MB
+    ```
+  - **Use Plists for JSON**: Switching `lsp-mode` from hash tables to property lists can yield significant speedups on modern Emacs versions:
+    ```elisp
+    (setq lsp-use-plists t)
+    ```
+    However, this setting also requires `LSP_USE_PLISTS=true` when `lsp-mode` is byte-compiled; see the official instructions.
 
 ### Startup Delay After Closing Buffers
 
