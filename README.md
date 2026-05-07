@@ -221,7 +221,7 @@ For a more robust setup using `use-package` and `straight.el`, you can use the f
   :straight (lsp-ltex-plus
              :type git
              :host github
-             :repo "username/emacs-ltex-plus")
+             :repo "alberti42/emacs-ltex-plus")
 
   :defer t
 
