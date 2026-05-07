@@ -137,7 +137,7 @@ For `lsp-ltex-plus` to work, Emacs must be able to find the `ltex-ls-plus` binar
 
 ```elisp
 (straight-use-package
- '(lsp-ltex-plus :type git :host github :repo "username/emacs-ltex-plus"))
+ '(lsp-ltex-plus :type git :host github :repo "alberti42/emacs-ltex-plus"))
 ```
 
 ### Manual Installation
